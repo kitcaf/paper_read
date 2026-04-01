@@ -1,0 +1,13 @@
+{
+  "name": "paper-read",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:web": "npm --prefix web run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:agent": "npm --prefix agent run dev",
+    "build:web": "npm --prefix web run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:agent": "npm --prefix agent run build"
+  }
+}
