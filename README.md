@@ -5,22 +5,36 @@ Web-first AI paper screening and reading system.
 Current target architecture:
 
 - Frontend: React + TypeScript
-- Backend API: Node.js + TypeScript
+- Backend API: Node.js + TypeScript + Fastify
 - Database: PostgreSQL
-- Agent runtime: TypeScript self-built workflow engine
-- Runtime model: Web app + background worker
+- Agent capability: backend-internal TypeScript module
+- Runtime model: Web app + backend service
+
+Repository mode:
+
+- Lightweight monorepo with `pnpm-workspace.yaml`
+- Shared cross-package types in `packages/shared`
 
 Suggested top-level layout:
 
+- `packages/shared/`
 - `web/`
 - `backend/`
-- `agent/`
 
 Basic repository scripts:
 
-- `npm run dev:web`
-- `npm run dev:backend`
-- `npm run dev:agent`
+- `pnpm install`
+- `pnpm run dev:web`
+- `pnpm run dev:backend`
+- `pnpm run build:shared`
+- `pnpm run build:backend`
+- `pnpm run build:web`
+- `pnpm run build`
+
+Backend package scripts:
+
+- `pnpm --filter @paper-read/backend dev`
+- `pnpm --filter @paper-read/backend dev:agent`
 
 Docs:
 

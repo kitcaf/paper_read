@@ -17,3 +17,5 @@ storage/exports/*
 !storage/markdown/.gitkeep
 !storage/notes/.gitkeep
 !storage/exports/.gitkeep
+
+TECH_STACK_AND_STRUCTURE.md

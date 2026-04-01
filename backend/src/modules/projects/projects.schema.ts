@@ -1,4 +1,7 @@
+import type { ProjectSummary } from "@paper-read/shared";
 import { z } from "zod";
+
+export type { ProjectSummary } from "@paper-read/shared";
 
 export const projectSummarySchema = z.object({
   id: z.string(),
@@ -6,6 +9,4 @@ export const projectSummarySchema = z.object({
   researchGoal: z.string(),
   paperCount: z.number().int().nonnegative(),
   taskCount: z.number().int().nonnegative()
-});
-
-export type ProjectSummary = z.infer<typeof projectSummarySchema>;
+}) satisfies z.ZodType<ProjectSummary>;

@@ -20,10 +20,10 @@
 
 - PostgreSQL
 
-### Agent 模块
+### Agent 能力
 
-- TypeScript 自构建 workflow engine
-- Workflow / Step / Adapter 模型
+- 后端内部 TypeScript agent 模块
+- Job / Step / Adapter 模型
 
 ### 文件存储
 
@@ -34,6 +34,12 @@
 
 ```text
 paper_read/
+├─ packages/
+│  └─ shared/
+│     ├─ src/
+│     │  └─ index.ts
+│     ├─ package.json
+│     └─ tsconfig.json
 ├─ web/
 │  ├─ public/
 │  ├─ src/
@@ -59,29 +65,12 @@ paper_read/
 │  │  ├─ plugins/
 │  │  ├─ routes/
 │  │  ├─ modules/
+│  │  │  ├─ agent/
 │  │  │  ├─ projects/
 │  │  │  ├─ papers/
 │  │  │  └─ tasks/
 │  │  ├─ db/
 │  │  ├─ lib/
-│  │  └─ types/
-│  ├─ tests/
-│  ├─ package.json
-│  └─ tsconfig.json
-├─ agent/
-│  ├─ src/
-│  │  ├─ worker.ts
-│  │  ├─ config/
-│  │  ├─ core/
-│  │  ├─ workflows/
-│  │  │  ├─ screening/
-│  │  │  └─ reading/
-│  │  ├─ steps/
-│  │  ├─ adapters/
-│  │  ├─ repositories/
-│  │  ├─ services/
-│  │  ├─ prompts/
-│  │  ├─ runtime/
 │  │  └─ types/
 │  ├─ tests/
 │  ├─ package.json
@@ -97,6 +86,15 @@ paper_read/
 │  └─ exports/
 ├─ .env.example
 ├─ package.json
+├─ pnpm-workspace.yaml
 ├─ tsconfig.base.json
 └─ README.md
 ```
+
+## 3. Monorepo 约定
+
+- 根目录使用 `pnpm-workspace.yaml` 管理 `packages/*`、`web`、`backend`
+- 根目录统一维护 `typescript`、`tsx`、`@types/node`
+- 共享类型与跨端模型收敛到 `packages/shared`
+- agent 作为 `backend/src/modules/agent/` 内部模块存在
+- 子包只保留自己真正需要的运行时依赖

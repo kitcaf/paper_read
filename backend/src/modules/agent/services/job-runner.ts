@@ -4,6 +4,7 @@ import { runScreeningWorkflow } from "../workflows/screening/screening.workflow.
 
 export async function runJob(job: JobRecord) {
   const context = createWorkflowContext(job);
+  context.metadata.workflowName = job.kind;
 
   if (job.kind === "screening") {
     return runScreeningWorkflow(context);

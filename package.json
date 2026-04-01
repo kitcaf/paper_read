@@ -2,12 +2,28 @@
   "name": "paper-read",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@10.18.1",
   "scripts": {
-    "dev:web": "npm --prefix web run dev",
-    "dev:backend": "npm --prefix backend run dev",
-    "dev:agent": "npm --prefix agent run dev",
-    "build:web": "npm --prefix web run build",
-    "build:backend": "npm --prefix backend run build",
-    "build:agent": "npm --prefix agent run build"
+    "dev:web": "pnpm --filter @paper-read/web dev",
+    "dev:backend": "pnpm --filter @paper-read/backend dev",
+    "build:shared": "pnpm --filter @paper-read/shared build",
+    "build:web": "pnpm --filter @paper-read/web build",
+    "build:backend": "pnpm --filter @paper-read/backend build",
+    "build": "pnpm run build:shared && pnpm run build:backend && pnpm run build:web"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/node": "^25.5.0",
+      "dotenv": "^17.3.1",
+      "pino": "^10.3.1",
+      "tsx": "^4.21.0",
+      "typescript": "^6.0.2",
+      "zod": "^4.3.6"
+    }
   }
 }

@@ -1,5 +1,7 @@
-export type JobKind = "screening" | "reading";
-export type JobStatus = "queued" | "running" | "completed" | "failed";
+import type { TaskKind, TaskStatus } from "@paper-read/shared";
+
+export type JobKind = TaskKind;
+export type JobStatus = TaskStatus;
 
 export interface JobRecord {
   id: string;
