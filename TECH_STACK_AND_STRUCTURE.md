@@ -11,9 +11,9 @@
 
 ### 后端
 
-- Node.js
+- Hono
 - TypeScript
-- Fastify
+- Bun
 - WebSocket / SSE
 
 ### 数据库
@@ -58,11 +58,19 @@ paper_read/
 │  ├─ tsconfig.json
 │  └─ vite.config.ts
 ├─ backend/
+│  ├─ infra/
+│  │  ├─ docker/
+│  │  └─ sql/
+│  ├─ storage/
+│  │  ├─ pdf/
+│  │  ├─ markdown/
+│  │  ├─ notes/
+│  │  └─ exports/
 │  ├─ src/
-│  │  ├─ app.ts
 │  │  ├─ server.ts
+│  │  ├─ app.ts
 │  │  ├─ config/
-│  │  ├─ plugins/
+│  │  ├─ middleware/
 │  │  ├─ routes/
 │  │  ├─ modules/
 │  │  │  ├─ agent/
@@ -76,15 +84,6 @@ paper_read/
 │  ├─ package.json
 │  └─ tsconfig.json
 ├─ docs/
-├─ infra/
-│  ├─ docker/
-│  └─ sql/
-├─ storage/
-│  ├─ pdf/
-│  ├─ markdown/
-│  ├─ notes/
-│  └─ exports/
-├─ .env.example
 ├─ package.json
 ├─ pnpm-workspace.yaml
 ├─ tsconfig.base.json
@@ -94,7 +93,7 @@ paper_read/
 ## 3. Monorepo 约定
 
 - 根目录使用 `pnpm-workspace.yaml` 管理 `packages/*`、`web`、`backend`
-- 根目录统一维护 `typescript`、`tsx`、`@types/node`
+- 根目录统一维护 workspace 和通用 TypeScript 工具
 - 共享类型与跨端模型收敛到 `packages/shared`
 - agent 作为 `backend/src/modules/agent/` 内部模块存在
-- 子包只保留自己真正需要的运行时依赖
+- Bun 与 Hono 相关依赖只放在 `backend` 包内

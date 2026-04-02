@@ -1,15 +1,17 @@
-import type { FastifyInstance } from "fastify";
+import { Hono } from "hono";
 
-import { registerAgentRoutes } from "../modules/agent/agent.route.js";
-import { registerPaperRoutes } from "../modules/papers/papers.route.js";
-import { registerProjectRoutes } from "../modules/projects/projects.route.js";
-import { registerTaskRoutes } from "../modules/tasks/tasks.route.js";
-import { registerHealthRoute } from "./health/health.route.js";
+import { paperRouter } from "../modules/papers/papers.router.js";
+import { screeningRouter } from "../modules/screening/screening.router.js";
+import { sourceRouter } from "../modules/sources/sources.router.js";
+import { healthRouter } from "./health/health.router.js";
 
-export async function registerRoutes(app: FastifyInstance) {
-  await registerHealthRoute(app);
-  await registerAgentRoutes(app);
-  await registerProjectRoutes(app);
-  await registerPaperRoutes(app);
-  await registerTaskRoutes(app);
+export function createApiApp() {
+  const apiApp = new Hono();
+
+  apiApp.route("/health", healthRouter);
+  apiApp.route("/sources", sourceRouter);
+  apiApp.route("/papers", paperRouter);
+  apiApp.route("/screening", screeningRouter);
+
+  return apiApp;
 }

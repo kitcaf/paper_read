@@ -5,7 +5,8 @@
 本文档用于明确项目当前采用的技术路线：
 
 - 前端使用 React + TypeScript
-- 后端使用 Node.js + TypeScript
+- 后端使用 Hono + TypeScript
+- 后端运行时使用 Bun
 - Agent 作为后端内部模块存在
 - 数据库使用 PostgreSQL
 - Web 应用作为唯一主入口
@@ -21,13 +22,13 @@
 - DTO 和状态类型更容易保持一致
 - Web 产品开发节奏更顺
 
-### 2.2 为什么后端选择 Node.js + TypeScript + Fastify
+### 2.2 为什么后端选择 Hono + Bun
 
-当前后端更适合采用 Fastify，原因是：
+当前后端更适合采用 Hono 配合 Bun，原因是：
 
-1. TypeScript 支持自然
-2. 对 API、WebSocket、后台任务协调都足够成熟
-3. 足够轻量，适合当前阶段
+1. Hono 天然适合按模块拆分子路由，并用 `app.route()` 组合
+2. Bun 可以直接运行 TypeScript，开发链路更轻
+3. 整体更贴近“前端生态统一”的目标，同时保留后端模块边界
 
 ### 2.3 为什么 agent 收回到 backend 内部
 
@@ -49,7 +50,7 @@
 
 ```text
 React Web
-  -> Node.js Backend API
+  -> Hono Backend API (Bun runtime)
     -> PostgreSQL
     -> File Storage
     -> Backend Agent Module
@@ -123,7 +124,7 @@ agent 模块负责：
 
 ```text
 backend/src/modules/agent/
-├─ agent.route.ts
+├─ agent.router.ts
 ├─ agent.service.ts
 ├─ worker.ts
 ├─ config/
@@ -140,7 +141,7 @@ backend/src/modules/agent/
 
 说明：
 
-- `agent.route.ts`：暴露 agent 相关接口
+- `agent.router.ts`：暴露 agent 相关接口
 - `agent.service.ts`：提供模块级调用入口
 - `worker.ts`：后台循环入口
 - 其余目录用于组织具体实现
@@ -166,10 +167,10 @@ web/src/
 
 ```text
 backend/src/
-├─ app.ts
 ├─ server.ts
+├─ app.ts
 ├─ config/
-├─ plugins/
+├─ middleware/
 ├─ routes/
 ├─ modules/
 │  ├─ agent/
@@ -189,10 +190,9 @@ paper_read/
 │  └─ shared/
 ├─ web/
 ├─ backend/
+│  ├─ infra/
+│  └─ storage/
 ├─ docs/
-├─ infra/
-├─ storage/
-├─ .env.example
 ├─ package.json
 ├─ pnpm-workspace.yaml
 ├─ tsconfig.base.json
@@ -204,7 +204,7 @@ paper_read/
 当前项目最合适的方向是：
 
 - 前端用 React + TypeScript
-- 后端用 Node.js + TypeScript + Fastify
+- 后端用 Hono + TypeScript，运行时使用 Bun
 - agent 作为 backend 内部模块存在
 - PostgreSQL 做业务持久化
 

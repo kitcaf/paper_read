@@ -1,5 +1,5 @@
-import { AppRouter } from "./router";
+import { ScreeningWorkspacePage } from "./pages/ScreeningWorkspacePage";
 
 export default function App() {
-  return <AppRouter />;
+  return <ScreeningWorkspacePage />;
 }
