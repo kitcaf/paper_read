@@ -1,6 +1,8 @@
 import type {
   AgentEvent,
+  ModelProviderSettings,
   PaginatedResponse,
+  PublicModelProviderSettings,
   ScreeningQueryDetail,
   ScreeningQueryOptions,
   ScreeningQuerySummary,
@@ -44,6 +46,31 @@ export async function listSources() {
   );
 
   return event.payload.sources satisfies SourceSummary[];
+}
+
+export async function getModelSettings(): Promise<PublicModelProviderSettings> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request({ type: "model.settings.get" }, "model.settings.loaded"),
+    "model.settings.loaded"
+  );
+
+  return event.payload.settings;
+}
+
+export async function updateModelSettings(
+  settings: ModelProviderSettings
+): Promise<PublicModelProviderSettings> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request(
+      { type: "model.settings.update", payload: { settings } },
+      "model.settings.updated"
+    ),
+    "model.settings.updated"
+  );
+
+  return event.payload.settings;
 }
 
 export async function listScreeningQueries(

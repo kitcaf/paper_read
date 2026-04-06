@@ -171,7 +171,8 @@ export async function analyzeIntentWithModel(
       ],
       temperature: SCREENING_MODEL_TEMPERATURE,
       maxTokens: SCREENING_MODEL_MAX_TOKENS,
-      responseFormat: "json_object"
+      responseFormat: "json_object",
+      stream: runtime.settings.stream
     });
 
     return parseIntentModelResponse(response.content);
@@ -211,7 +212,8 @@ export async function scorePaperWithModel(
       ],
       temperature: SCREENING_MODEL_TEMPERATURE,
       maxTokens: SCREENING_MODEL_MAX_TOKENS,
-      responseFormat: "json_object"
+      responseFormat: "json_object",
+      stream: runtime.settings.stream
     });
 
     return parseScoreModelResponse(runtime, response.content);

@@ -1,5 +1,5 @@
 import type { ModelGenerateRequest, ModelProvider } from "../types";
-import { ensureOkResponse, readJsonResponse, trimTrailingSlash } from "../http";
+import { ensureOkResponse, readJsonResponse, readNdjsonChunks, trimTrailingSlash } from "../http";
 
 interface OllamaChatResponse {
   message?: {
@@ -11,7 +11,7 @@ function toOllamaBody(settingsModelName: string, request: ModelGenerateRequest) 
   return {
     model: request.modelName ?? settingsModelName,
     messages: request.messages,
-    stream: false,
+    stream: Boolean(request.stream),
     ...(request.responseFormat === "json_object" ? { format: "json" } : {}),
     options: {
       temperature: request.temperature,
@@ -29,6 +29,10 @@ function readOllamaContent(payload: unknown) {
   }
 
   return content;
+}
+
+function readOllamaStreamContent(chunks: unknown[]) {
+  return chunks.map(readOllamaContent).join("").trim();
 }
 
 export const ollamaProvider: ModelProvider = {
@@ -49,6 +53,21 @@ export const ollamaProvider: ModelProvider = {
     });
 
     await ensureOkResponse(response, "Ollama provider");
+    if (request.stream) {
+      const chunks = await readNdjsonChunks(response);
+      const content = readOllamaStreamContent(chunks);
+      if (!content) {
+        throw new Error("Ollama provider returned an empty streaming completion.");
+      }
+
+      return {
+        provider: "ollama",
+        modelName: request.modelName ?? settings.modelName,
+        content,
+        raw: chunks
+      };
+    }
+
     const payload = await readJsonResponse(response);
 
     return {

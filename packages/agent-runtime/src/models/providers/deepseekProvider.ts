@@ -1,15 +1,15 @@
 import type { ModelProvider } from "../types";
 import { requestChatCompletion } from "./chatCompletions";
 
-export const openAICompatibleProvider: ModelProvider = {
-  kind: "openai-compatible",
+export const deepSeekProvider: ModelProvider = {
+  kind: "deepseek",
   async generate(settings, request) {
     if (!settings.baseUrl) {
-      throw new Error("OpenAI-compatible provider requires a baseUrl.");
+      throw new Error("DeepSeek provider requires a baseUrl.");
     }
 
     const completion = await requestChatCompletion({
-      providerName: "OpenAI-compatible provider",
+      providerName: "DeepSeek provider",
       baseUrl: settings.baseUrl,
       apiKey: settings.apiKey,
       modelName: settings.modelName,
@@ -17,7 +17,7 @@ export const openAICompatibleProvider: ModelProvider = {
     });
 
     return {
-      provider: "openai-compatible",
+      provider: "deepseek",
       modelName: request.modelName ?? settings.modelName,
       content: completion.content,
       raw: completion.raw

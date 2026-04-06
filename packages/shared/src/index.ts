@@ -54,7 +54,13 @@ export type ScreeningInputMode = "title" | "title_abstract";
 export type ScreeningQueryStatus = "queued" | "running" | "completed" | "failed";
 export type ScreeningResultStatus = "pending" | "completed" | "failed";
 export type ScreeningDecision = "keep" | "discard" | "uncertain";
-export type ModelProviderKind = "mock" | "openai-compatible" | "ollama";
+export type ModelProviderKind =
+  | "mock"
+  | "openai-compatible"
+  | "ollama"
+  | "anthropic"
+  | "gemini"
+  | "deepseek";
 export type ModelResponseFormat = "text" | "json_object";
 
 export interface ModelProviderSettings {
@@ -65,6 +71,7 @@ export interface ModelProviderSettings {
   temperature?: number;
   maxTokens?: number;
   responseFormat?: ModelResponseFormat;
+  stream?: boolean;
 }
 
 export interface PublicModelProviderSettings

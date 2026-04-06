@@ -10,20 +10,34 @@ const DEFAULT_TEMPERATURE = 0.1;
 const DEFAULT_MAX_TOKENS = 900;
 const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
+const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_MOCK_MODEL_NAME = "rule-based-title-screening";
 const DEFAULT_OPENAI_COMPATIBLE_MODEL_NAME = "gpt-4.1-mini";
 const DEFAULT_OLLAMA_MODEL_NAME = "llama3.1";
+const DEFAULT_ANTHROPIC_MODEL_NAME = "claude-sonnet-4-5";
+const DEFAULT_GEMINI_MODEL_NAME = "gemini-2.5-flash";
+const DEFAULT_DEEPSEEK_MODEL_NAME = "deepseek-chat";
 
 export const DEFAULT_MODEL_PROVIDER_SETTINGS: RequiredModelProviderSettings = {
   provider: "mock",
   modelName: DEFAULT_MOCK_MODEL_NAME,
   temperature: DEFAULT_TEMPERATURE,
   maxTokens: DEFAULT_MAX_TOKENS,
-  responseFormat: "json_object"
+  responseFormat: "json_object",
+  stream: false
 };
 
 function isModelProviderKind(value: unknown): value is ModelProviderKind {
-  return value === "mock" || value === "openai-compatible" || value === "ollama";
+  return (
+    value === "mock" ||
+    value === "openai-compatible" ||
+    value === "ollama" ||
+    value === "anthropic" ||
+    value === "gemini" ||
+    value === "deepseek"
+  );
 }
 
 function readOptionalString(value: unknown) {
@@ -43,6 +57,18 @@ function defaultModelName(provider: ModelProviderKind) {
     return DEFAULT_OLLAMA_MODEL_NAME;
   }
 
+  if (provider === "anthropic") {
+    return DEFAULT_ANTHROPIC_MODEL_NAME;
+  }
+
+  if (provider === "gemini") {
+    return DEFAULT_GEMINI_MODEL_NAME;
+  }
+
+  if (provider === "deepseek") {
+    return DEFAULT_DEEPSEEK_MODEL_NAME;
+  }
+
   return DEFAULT_MOCK_MODEL_NAME;
 }
 
@@ -53,6 +79,18 @@ function defaultBaseUrl(provider: ModelProviderKind) {
 
   if (provider === "ollama") {
     return DEFAULT_OLLAMA_BASE_URL;
+  }
+
+  if (provider === "anthropic") {
+    return DEFAULT_ANTHROPIC_BASE_URL;
+  }
+
+  if (provider === "gemini") {
+    return DEFAULT_GEMINI_BASE_URL;
+  }
+
+  if (provider === "deepseek") {
+    return DEFAULT_DEEPSEEK_BASE_URL;
   }
 
   return undefined;
@@ -79,7 +117,8 @@ export function normalizeModelProviderSettings(
     responseFormat:
       settings?.responseFormat === "text" || settings?.responseFormat === "json_object"
         ? settings.responseFormat
-        : DEFAULT_MODEL_PROVIDER_SETTINGS.responseFormat
+        : DEFAULT_MODEL_PROVIDER_SETTINGS.responseFormat,
+    stream: Boolean(settings?.stream)
   };
 }
 
@@ -99,6 +138,27 @@ export function withRuntimeSecrets(
 
   if (settings.provider === "ollama") {
     const apiKey = readOptionalString(process.env.PAPER_READ_OLLAMA_API_KEY);
+    return apiKey ? { ...settings, apiKey } : settings;
+  }
+
+  if (settings.provider === "anthropic") {
+    const apiKey = readOptionalString(
+      process.env.PAPER_READ_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY
+    );
+    return apiKey ? { ...settings, apiKey } : settings;
+  }
+
+  if (settings.provider === "gemini") {
+    const apiKey = readOptionalString(
+      process.env.PAPER_READ_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY
+    );
+    return apiKey ? { ...settings, apiKey } : settings;
+  }
+
+  if (settings.provider === "deepseek") {
+    const apiKey = readOptionalString(
+      process.env.PAPER_READ_DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY
+    );
     return apiKey ? { ...settings, apiKey } : settings;
   }
 

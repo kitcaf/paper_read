@@ -243,7 +243,11 @@ export function updateModelProviderSettings(
   db: Database,
   settings: ModelProviderSettings
 ) {
-  const normalizedSettings = normalizeModelProviderSettings(settings);
+  const currentSettings = getModelProviderSettings(db);
+  const normalizedSettings = normalizeModelProviderSettings({
+    ...settings,
+    apiKey: settings.apiKey ?? currentSettings.apiKey
+  });
 
   db.query(
     `

@@ -17,6 +17,7 @@ export interface ModelGenerateRequest {
   temperature?: number;
   maxTokens?: number;
   responseFormat?: ModelResponseFormat;
+  stream?: boolean;
 }
 
 export interface ModelGenerateResponse {
@@ -40,6 +41,7 @@ export interface RequiredModelProviderSettings extends ModelProviderSettings {
   temperature: number;
   maxTokens: number;
   responseFormat: ModelResponseFormat;
+  stream: boolean;
 }
 
 export interface ModelRuntime {
