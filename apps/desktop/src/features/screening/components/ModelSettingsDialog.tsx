@@ -1,258 +1,191 @@
 import type {
   ModelProviderKind,
-  ModelProviderSettings,
-  PublicModelProviderSettings
+  ModelProviderProfile,
+  ModelProviderProfileInput
 } from "@paper-read/shared";
+import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { ModalShell } from "../../../components/ModalShell";
+import { ModalRoot } from "../../../components/ModalRoot";
+import { ModelProfileForm } from "./ModelProfileForm";
+import { ModelProfileList } from "./ModelProfileList";
+import {
+  createDraftFromProfile,
+  getProviderOption,
+  type ModelProfileDraft
+} from "./modelSettingsConfig";
 
 interface ModelSettingsDialogProps {
   open: boolean;
-  settings: PublicModelProviderSettings | null;
+  profiles: ModelProviderProfile[];
+  isLoading: boolean;
   isSaving: boolean;
   errorMessage?: string | null;
   onClose: () => void;
-  onSave: (settings: ModelProviderSettings) => Promise<boolean>;
+  onSaveProfile: (profile: ModelProviderProfileInput) => Promise<boolean>;
+  onDeleteProfile: (profileId: string) => Promise<void>;
+  onSetDefaultProfile: (profileId: string) => Promise<void>;
 }
 
-interface ProviderOption {
-  provider: ModelProviderKind;
-  label: string;
-  defaultModelName: string;
-  defaultBaseUrl?: string;
-  requiresApiKey: boolean;
-}
+function buildProfileInput(
+  selectedProfileId: string | null,
+  draft: ModelProfileDraft
+): ModelProviderProfileInput {
+  const selectedOption = getProviderOption(draft.provider);
 
-const DEFAULT_PROVIDER_OPTION: ProviderOption = {
-  provider: "mock",
-  label: "Mock / Rule-based",
-  defaultModelName: "rule-based-title-screening",
-  requiresApiKey: false
-};
-
-const PROVIDER_OPTIONS: ProviderOption[] = [
-  DEFAULT_PROVIDER_OPTION,
-  {
-    provider: "openai-compatible",
-    label: "OpenAI Compatible",
-    defaultModelName: "gpt-4.1-mini",
-    defaultBaseUrl: "https://api.openai.com/v1",
-    requiresApiKey: true
-  },
-  {
-    provider: "anthropic",
-    label: "Anthropic Claude",
-    defaultModelName: "claude-sonnet-4-5",
-    defaultBaseUrl: "https://api.anthropic.com/v1",
-    requiresApiKey: true
-  },
-  {
-    provider: "gemini",
-    label: "Google Gemini",
-    defaultModelName: "gemini-2.5-flash",
-    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    requiresApiKey: true
-  },
-  {
-    provider: "deepseek",
-    label: "DeepSeek",
-    defaultModelName: "deepseek-chat",
-    defaultBaseUrl: "https://api.deepseek.com",
-    requiresApiKey: true
-  },
-  {
-    provider: "kimi",
-    label: "Kimi / Moonshot",
-    defaultModelName: "kimi-k2.5",
-    defaultBaseUrl: "https://api.moonshot.cn/v1",
-    requiresApiKey: true
-  },
-  {
-    provider: "ollama",
-    label: "Ollama / Local",
-    defaultModelName: "llama3.1",
-    defaultBaseUrl: "http://127.0.0.1:11434",
-    requiresApiKey: false
-  }
-];
-
-function getProviderOption(provider: ModelProviderKind) {
-  return (
-    PROVIDER_OPTIONS.find((option) => option.provider === provider) ?? DEFAULT_PROVIDER_OPTION
-  );
-}
-
-function getInputClassName() {
-  return "h-11 w-full rounded-2xl border border-ink-300/45 bg-white/85 px-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-700/60";
+  return {
+    id: selectedProfileId ?? undefined,
+    name: draft.name.trim() || draft.modelName,
+    isDefault: draft.isDefault,
+    settings: {
+      provider: draft.provider,
+      modelName: draft.modelName.trim() || selectedOption.defaultModelName,
+      ...(draft.baseUrl.trim() ? { baseUrl: draft.baseUrl.trim() } : {}),
+      ...(draft.apiKey.trim() ? { apiKey: draft.apiKey.trim() } : {}),
+      temperature: Number(draft.temperature),
+      maxTokens: Number(draft.maxTokens),
+      responseFormat: "json_object"
+    }
+  };
 }
 
 export function ModelSettingsDialog({
   open,
-  settings,
+  profiles,
+  isLoading,
   isSaving,
   errorMessage,
   onClose,
-  onSave
+  onSaveProfile,
+  onDeleteProfile,
+  onSetDefaultProfile
 }: ModelSettingsDialogProps) {
-  const [provider, setProvider] = useState<ModelProviderKind>("mock");
-  const [modelName, setModelName] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [temperature, setTemperature] = useState("0.1");
-  const [maxTokens, setMaxTokens] = useState("900");
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [draft, setDraft] = useState(createDraftFromProfile(null));
+  const selectedProfile =
+    profiles.find((profile) => profile.id === selectedProfileId) ?? profiles[0] ?? null;
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const nextProvider = settings?.provider ?? "mock";
-    const option = getProviderOption(nextProvider);
-    setProvider(nextProvider);
-    setModelName(settings?.modelName ?? option.defaultModelName);
-    setBaseUrl(settings?.baseUrl ?? option.defaultBaseUrl ?? "");
-    setApiKey("");
-    setTemperature(String(settings?.temperature ?? 0.1));
-    setMaxTokens(String(settings?.maxTokens ?? 900));
-  }, [open, settings]);
+    const initialProfile = profiles.find((profile) => profile.isDefault) ?? profiles[0] ?? null;
+    setSelectedProfileId(initialProfile?.id ?? null);
+    setDraft(createDraftFromProfile(initialProfile));
+  }, [open, profiles]);
 
-  function handleProviderChange(nextProvider: ModelProviderKind) {
-    const option = getProviderOption(nextProvider);
-    setProvider(nextProvider);
-    setModelName(option.defaultModelName);
-    setBaseUrl(option.defaultBaseUrl ?? "");
-    setApiKey("");
+  function handleSelectProfile(profile: ModelProviderProfile) {
+    setSelectedProfileId(profile.id);
+    setDraft(createDraftFromProfile(profile));
   }
 
-  async function handleSubmit() {
+  function handleCreateProfile() {
+    setSelectedProfileId(null);
+    setDraft(createDraftFromProfile(null));
+  }
+
+  function handleProviderChange(provider: ModelProviderKind) {
     const option = getProviderOption(provider);
-    await onSave({
+    setDraft((currentDraft) => ({
+      ...currentDraft,
       provider,
-      modelName: modelName.trim() || option.defaultModelName,
-      ...(baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
-      ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
-      temperature: Number(temperature),
-      maxTokens: Number(maxTokens),
-      responseFormat: "json_object"
-    });
+      modelName: option.defaultModelName,
+      baseUrl: option.defaultBaseUrl ?? "",
+      apiKey: ""
+    }));
   }
 
-  const selectedOption = getProviderOption(provider);
+  async function handleSave() {
+    const didSave = await onSaveProfile(buildProfileInput(selectedProfileId, draft));
+    if (didSave && !selectedProfileId) {
+      setDraft(createDraftFromProfile(null));
+    }
+  }
 
   return (
-    <ModalShell
+    <ModalRoot
+      ariaLabelledBy="settings-title"
+      className="relative grid h-[min(780px,88vh)] w-[min(1060px,94vw)] overflow-hidden rounded-[28px] border border-white/75 bg-paper-50/96 shadow-[0_24px_80px_rgba(24,37,47,0.18)] backdrop-blur-2xl md:grid-cols-[220px_minmax(0,1fr)]"
       open={open}
-      title="模型设置"
-      description="配置本地 agent 调用的大模型协议；默认优先使用流式 API，服务端不支持时会自动降级。"
-      sizeClassName="max-w-2xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-ink-500">
-            {settings?.hasApiKey ? "已保存 API Key。留空不会覆盖。" : "尚未保存 API Key。"}
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              className="inline-flex h-11 items-center justify-center rounded-full border border-ink-300/45 px-5 text-sm font-medium text-ink-700 transition hover:border-ink-300/65 hover:bg-white"
-              type="button"
-              onClick={onClose}
-            >
-              取消
-            </button>
-            <button
-              className="inline-flex h-11 items-center justify-center rounded-full bg-ink-900 px-5 text-sm font-semibold text-paper-50 transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:bg-ink-500"
-              type="button"
-              disabled={isSaving}
-              onClick={() => void handleSubmit()}
-            >
-              {isSaving ? "保存中..." : "保存设置"}
-            </button>
-          </div>
-        </div>
-      }
       onClose={onClose}
     >
-      <div className="grid gap-4">
+      <aside className="border-b border-ink-300/30 bg-paper-50/92 p-4 md:border-b-0 md:border-r">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="settings-title" className="text-lg font-semibold text-ink-900">
+              设置
+            </h2>
+            <p className="mt-1 text-xs text-ink-500">本地工作区配置</p>
+          </div>
+          <button
+            aria-label="Close settings"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink-300/40 bg-white/75 text-ink-600 transition hover:border-ink-300/65 hover:bg-white hover:text-ink-900"
+            type="button"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <nav className="mt-6">
+          <button
+            className="flex w-full items-center justify-between rounded-2xl bg-white px-3 py-3 text-left text-sm font-medium text-ink-900 shadow-[0_10px_24px_rgba(24,37,47,0.06)]"
+            type="button"
+          >
+            <span>LLM</span>
+            <span className="rounded-full bg-ink-900 px-2 py-0.5 text-[0.68rem] text-paper-50">
+              {profiles.length}
+            </span>
+          </button>
+        </nav>
+      </aside>
+
+      <section className="min-h-0 overflow-y-auto p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold text-ink-900">LLM API</h3>
+            <p className="mt-1 text-sm text-ink-500">
+              可以配置多个模型；发起对话时可选择其中一个模型配置。
+            </p>
+          </div>
+          <button
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-ink-300/45 bg-white px-4 text-sm font-medium text-ink-700 transition hover:border-ink-300/65"
+            type="button"
+            onClick={handleCreateProfile}
+          >
+            <Plus className="h-4 w-4" />
+            新增模型
+          </button>
+        </div>
+
         {errorMessage ? (
-          <div className="rounded-2xl border border-coral-500/20 bg-coral-500/8 px-4 py-3 text-sm text-coral-500">
+          <div className="mt-4 rounded-2xl border border-coral-500/20 bg-coral-500/8 px-4 py-3 text-sm text-coral-500">
             {errorMessage}
           </div>
         ) : null}
 
-        <label className="grid gap-2 text-sm font-medium text-ink-700">
-          Provider
-          <select
-            className={getInputClassName()}
-            value={provider}
-            onChange={(event) => handleProviderChange(event.target.value as ModelProviderKind)}
-          >
-            {PROVIDER_OPTIONS.map((option) => (
-              <option key={option.provider} value={option.provider}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            Model
-            <input
-              className={getInputClassName()}
-              value={modelName}
-              placeholder={selectedOption.defaultModelName}
-              onChange={(event) => setModelName(event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            API Key
-            <input
-              className={getInputClassName()}
-              value={apiKey}
-              placeholder={selectedOption.requiresApiKey ? "sk-..." : "可选"}
-              type="password"
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-          </label>
-        </div>
-
-        <label className="grid gap-2 text-sm font-medium text-ink-700">
-          Base URL
-          <input
-            className={getInputClassName()}
-            value={baseUrl}
-            placeholder={selectedOption.defaultBaseUrl ?? "无需配置"}
-            onChange={(event) => setBaseUrl(event.target.value)}
+        <div className="mt-5 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <ModelProfileList
+            profiles={profiles}
+            selectedProfileId={selectedProfileId}
+            isLoading={isLoading}
+            onSelectProfile={handleSelectProfile}
           />
-        </label>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            Temperature
-            <input
-              className={getInputClassName()}
-              value={temperature}
-              inputMode="decimal"
-              onChange={(event) => setTemperature(event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            Max Tokens
-            <input
-              className={getInputClassName()}
-              value={maxTokens}
-              inputMode="numeric"
-              onChange={(event) => setMaxTokens(event.target.value)}
-            />
-          </label>
+          <ModelProfileForm
+            draft={draft}
+            selectedProfile={selectedProfile}
+            profileCount={profiles.length}
+            isSaving={isSaving}
+            onDraftChange={setDraft}
+            onProviderChange={handleProviderChange}
+            onSave={() => void handleSave()}
+            onDelete={(profileId) => void onDeleteProfile(profileId)}
+            onSetDefault={(profileId) => void onSetDefaultProfile(profileId)}
+          />
         </div>
-
-        <div className="rounded-2xl border border-ink-300/35 bg-white/65 px-4 py-3 text-xs leading-5 text-ink-500">
-          当前模型调用默认优先走流式接口；如果该服务端或模型不支持流式，agent 会自动重试非流式请求。
-        </div>
-      </div>
-    </ModalShell>
+      </section>
+    </ModalRoot>
   );
 }

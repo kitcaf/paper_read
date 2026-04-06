@@ -1,5 +1,7 @@
 import type {
   AgentEvent,
+  ModelProviderProfile,
+  ModelProviderProfileInput,
   ModelProviderSettings,
   PaginatedResponse,
   PublicModelProviderSettings,
@@ -24,6 +26,7 @@ interface QueryFilterInput {
 interface CreateScreeningQueryInput {
   sourceKey: string;
   queryText: string;
+  modelProfileId?: string;
   options: ScreeningQueryOptions;
 }
 
@@ -71,6 +74,57 @@ export async function updateModelSettings(
   );
 
   return event.payload.settings;
+}
+
+export async function listModelProfiles(): Promise<ModelProviderProfile[]> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request({ type: "model.profiles.list" }, "model.profiles.loaded"),
+    "model.profiles.loaded"
+  );
+
+  return event.payload.profiles;
+}
+
+export async function upsertModelProfile(
+  profile: ModelProviderProfileInput
+): Promise<ModelProviderProfile> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request(
+      { type: "model.profiles.upsert", payload: { profile } },
+      "model.profile.upserted"
+    ),
+    "model.profile.upserted"
+  );
+
+  return event.payload.profile;
+}
+
+export async function deleteModelProfile(profileId: string): Promise<ModelProviderProfile[]> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request(
+      { type: "model.profiles.delete", payload: { profileId } },
+      "model.profile.deleted"
+    ),
+    "model.profile.deleted"
+  );
+
+  return event.payload.profiles;
+}
+
+export async function setDefaultModelProfile(profileId: string): Promise<ModelProviderProfile[]> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request(
+      { type: "model.profiles.set_default", payload: { profileId } },
+      "model.profile.default_set"
+    ),
+    "model.profile.default_set"
+  );
+
+  return event.payload.profiles;
 }
 
 export async function listScreeningQueries(
@@ -130,6 +184,7 @@ export async function createScreeningQuery(input: CreateScreeningQueryInput) {
         payload: {
           sourceKey: input.sourceKey,
           queryText: input.queryText,
+          modelProfileId: input.modelProfileId,
           options: input.options
         }
       },

@@ -31,9 +31,10 @@ export function ScreeningWorkspacePage() {
   const currentSourceLabel = selectedQuery
     ? formatSourceLabel(selectedQuery.sourceKey, sources)
     : null;
-  const currentModelLabel = modelSettings.settings
-    ? `${modelSettings.settings.provider} · ${modelSettings.settings.modelName}`
-    : "Model";
+  const currentModelLabel =
+    selectedQuery?.modelProfileName ??
+    modelSettings.defaultProfile?.name ??
+    "Model";
 
   return (
     <>
@@ -52,7 +53,6 @@ export function ScreeningWorkspacePage() {
             isRightPanelCollapsed={isRightPanelCollapsed}
             onToggleLeftPanel={onToggleLeftPanel}
             onToggleRightPanel={onToggleRightPanel}
-            onOpenModelSettings={modelSettings.onOpen}
           />
         )}
         sidebar={({ onToggleSidebar }) => (
@@ -63,6 +63,7 @@ export function ScreeningWorkspacePage() {
             onSelectQuery={onSelectQuery}
             onCreateChat={onStartNewChat}
             onToggleSidebar={onToggleSidebar}
+            onOpenSettings={modelSettings.onOpen}
           />
         )}
         main={
@@ -94,7 +95,11 @@ export function ScreeningWorkspacePage() {
               <div className="pointer-events-auto mx-auto max-w-[980px]">
                 <QueryComposer
                   sources={sources}
+                  modelProfiles={modelSettings.profiles}
                   defaultSourceKey={selectedQuery?.sourceKey}
+                  defaultModelProfileId={
+                    selectedQuery?.modelProfileId ?? modelSettings.defaultProfile?.id
+                  }
                   resetKey={composerResetKey}
                   isSubmitting={isSubmitting}
                   onSubmit={onSubmitQuery}
@@ -116,11 +121,14 @@ export function ScreeningWorkspacePage() {
 
       <ModelSettingsDialog
         open={modelSettings.isOpen}
-        settings={modelSettings.settings}
+        profiles={modelSettings.profiles}
+        isLoading={modelSettings.isLoading}
         isSaving={modelSettings.isSaving}
         errorMessage={modelSettings.errorMessage}
         onClose={modelSettings.onClose}
-        onSave={modelSettings.onSave}
+        onSaveProfile={modelSettings.onSaveProfile}
+        onDeleteProfile={modelSettings.onDeleteProfile}
+        onSetDefaultProfile={modelSettings.onSetDefaultProfile}
       />
     </>
   );

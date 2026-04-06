@@ -1,5 +1,5 @@
 import type { ScreeningQuerySummary, SourceSummary } from "@paper-read/shared";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft, Plus, Settings } from "lucide-react";
 
 import {
   formatConversationTimestamp,
@@ -15,6 +15,7 @@ interface HistorySidebarProps {
   onSelectQuery: (queryId: string) => void;
   onCreateChat: () => void;
   onToggleSidebar: () => void;
+  onOpenSettings: () => void;
 }
 
 export function HistorySidebar({
@@ -23,7 +24,8 @@ export function HistorySidebar({
   selectedQueryId,
   onSelectQuery,
   onCreateChat,
-  onToggleSidebar
+  onToggleSidebar,
+  onOpenSettings
 }: HistorySidebarProps) {
   return (
     <aside className="flex h-full min-h-screen flex-col">
@@ -97,6 +99,17 @@ export function HistorySidebar({
         ) : (
           <div className="px-2 py-3 text-sm text-ink-500">还没有历史对话。</div>
         )}
+      </div>
+
+      <div className="border-t border-ink-300/35 px-3 py-3">
+        <button
+          className="inline-flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-medium text-ink-600 transition hover:bg-white hover:text-ink-900"
+          type="button"
+          onClick={onOpenSettings}
+        >
+          <Settings className="h-4 w-4" />
+          <span>设置</span>
+        </button>
       </div>
     </aside>
   );

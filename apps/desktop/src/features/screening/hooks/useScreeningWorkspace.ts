@@ -18,6 +18,7 @@ import {
 interface SubmitScreeningQueryInput {
   sourceKey: string;
   queryText: string;
+  modelProfileId?: string;
   options: ScreeningQueryOptions;
 }
 

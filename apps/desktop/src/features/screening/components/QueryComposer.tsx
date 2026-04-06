@@ -1,4 +1,4 @@
-import type { ScreeningQueryOptions, SourceSummary } from "@paper-read/shared";
+import type { ModelProviderProfile, ScreeningQueryOptions, SourceSummary } from "@paper-read/shared";
 import type { FormEvent } from "react";
 import { ArrowUp, ChevronDown, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -9,19 +9,24 @@ import { ScreeningSourceDialog } from "./ScreeningSourceDialog";
 
 interface QueryComposerProps {
   sources: SourceSummary[];
+  modelProfiles: ModelProviderProfile[];
   defaultSourceKey?: string;
+  defaultModelProfileId?: string;
   resetKey: number;
   isSubmitting: boolean;
   onSubmit: (input: {
     sourceKey: string;
     queryText: string;
+    modelProfileId?: string;
     options: ScreeningQueryOptions;
   }) => Promise<boolean> | boolean;
 }
 
 export function QueryComposer({
   sources,
+  modelProfiles,
   defaultSourceKey,
+  defaultModelProfileId,
   resetKey,
   isSubmitting,
   onSubmit
@@ -30,16 +35,20 @@ export function QueryComposer({
   const {
     queryText,
     activeSourceKey,
+    activeModelProfileId,
     isSourceDialogOpen,
     canSubmit,
     setQueryText,
+    setActiveModelProfileId,
     setIsSourceDialogOpen,
     handleSelectSource,
     handleClearSource,
     handleSubmit: submitScreeningMessage
   } = useScreeningComposer({
     sources,
+    modelProfiles,
     defaultSourceKey,
+    defaultModelProfileId,
     resetKey,
     onSubmit
   });
@@ -126,6 +135,21 @@ export function QueryComposer({
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Research mode</span>
               </div>
+
+              {modelProfiles.length ? (
+                <select
+                  aria-label="Select model profile"
+                  className="h-10 max-w-[220px] rounded-full border border-ink-300/45 bg-paper-50 px-3 text-xs font-medium text-ink-700 outline-none transition hover:border-ink-300/65 hover:bg-white"
+                  value={activeModelProfileId}
+                  onChange={(event) => setActiveModelProfileId(event.target.value)}
+                >
+                  {modelProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
             </div>
 
             <button

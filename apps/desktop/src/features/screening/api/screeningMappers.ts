@@ -66,6 +66,8 @@ export function mapConversationToScreeningSummary(
   return {
     id: conversation.id,
     sourceKey: readString(metadata.sourceKey, "local"),
+    modelProfileId: readString(metadata.modelProfileId) || undefined,
+    modelProfileName: readString(metadata.modelProfileName) || undefined,
     queryTitle: conversation.title,
     queryText: readString(metadata.queryText, conversation.title),
     inputMode: "title",

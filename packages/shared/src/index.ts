@@ -80,6 +80,22 @@ export interface PublicModelProviderSettings
   hasApiKey: boolean;
 }
 
+export interface ModelProviderProfile {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  settings: PublicModelProviderSettings;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModelProviderProfileInput {
+  id?: string;
+  name: string;
+  isDefault?: boolean;
+  settings: ModelProviderSettings;
+}
+
 export interface ScreeningQueryOptions {
   threshold?: number;
   topK?: number;
@@ -98,6 +114,8 @@ export interface ScreeningIntent {
 export interface ScreeningQuerySummary {
   id: string;
   sourceKey: string;
+  modelProfileId?: string;
+  modelProfileName?: string;
   queryTitle: string;
   queryText: string;
   inputMode: ScreeningInputMode;
@@ -154,6 +172,10 @@ export type AgentCommandType =
   | "sources.list"
   | "model.settings.get"
   | "model.settings.update"
+  | "model.profiles.list"
+  | "model.profiles.upsert"
+  | "model.profiles.delete"
+  | "model.profiles.set_default"
   | "screening.start"
   | "screening.results.get"
   | "conversation.list"
@@ -176,11 +198,16 @@ export type AgentCommand =
   | AgentCommandBase<"sources.list">
   | AgentCommandBase<"model.settings.get">
   | AgentCommandWithPayload<"model.settings.update", { settings: ModelProviderSettings }>
+  | AgentCommandBase<"model.profiles.list">
+  | AgentCommandWithPayload<"model.profiles.upsert", { profile: ModelProviderProfileInput }>
+  | AgentCommandWithPayload<"model.profiles.delete", { profileId: string }>
+  | AgentCommandWithPayload<"model.profiles.set_default", { profileId: string }>
   | AgentCommandWithPayload<
       "screening.start",
       {
         sourceKey: string;
         queryText: string;
+        modelProfileId?: string;
         options?: ScreeningQueryOptions;
       }
     >
@@ -196,6 +223,10 @@ export type AgentEventType =
   | "sources.loaded"
   | "model.settings.loaded"
   | "model.settings.updated"
+  | "model.profiles.loaded"
+  | "model.profile.upserted"
+  | "model.profile.deleted"
+  | "model.profile.default_set"
   | "model.provider_ready"
   | "conversation.listed"
   | "conversation.loaded"
@@ -253,9 +284,15 @@ export type AgentEvent =
   | AgentEventBase<"sources.loaded", { sources: SourceSummary[] }>
   | AgentEventBase<"model.settings.loaded", { settings: PublicModelProviderSettings }>
   | AgentEventBase<"model.settings.updated", { settings: PublicModelProviderSettings }>
+  | AgentEventBase<"model.profiles.loaded", { profiles: ModelProviderProfile[] }>
+  | AgentEventBase<"model.profile.upserted", { profile: ModelProviderProfile }>
+  | AgentEventBase<"model.profile.deleted", { profileId: string; profiles: ModelProviderProfile[] }>
+  | AgentEventBase<"model.profile.default_set", { profile: ModelProviderProfile; profiles: ModelProviderProfile[] }>
   | AgentEventBase<
       "model.provider_ready",
       {
+        profileId?: string;
+        profileName?: string;
         provider: ModelProviderKind;
         modelName: string;
         baseUrl?: string;

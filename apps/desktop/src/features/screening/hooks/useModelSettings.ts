@@ -1,10 +1,15 @@
-import type { ModelProviderSettings, PublicModelProviderSettings } from "@paper-read/shared";
+import type { ModelProviderProfile, ModelProviderProfileInput } from "@paper-read/shared";
 import { useEffect, useEffectEvent, useState } from "react";
 
-import { getModelSettings, updateModelSettings } from "../api/screeningApi";
+import {
+  deleteModelProfile,
+  listModelProfiles,
+  setDefaultModelProfile,
+  upsertModelProfile
+} from "../api/screeningApi";
 
 export function useModelSettings() {
-  const [settings, setSettings] = useState<PublicModelProviderSettings | null>(null);
+  const [profiles, setProfiles] = useState<ModelProviderProfile[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -15,10 +20,10 @@ export function useModelSettings() {
     setErrorMessage(null);
 
     try {
-      setSettings(await getModelSettings());
+      setProfiles(await listModelProfiles());
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load model settings."
+        error instanceof Error ? error.message : "Failed to load model profiles."
       );
     } finally {
       setIsLoading(false);
@@ -29,17 +34,17 @@ export function useModelSettings() {
     void loadSettingsEvent();
   }, []);
 
-  async function handleSaveSettings(nextSettings: ModelProviderSettings) {
+  async function handleSaveProfile(profile: ModelProviderProfileInput) {
     setIsSaving(true);
     setErrorMessage(null);
 
     try {
-      setSettings(await updateModelSettings(nextSettings));
-      setIsOpen(false);
+      await upsertModelProfile(profile);
+      setProfiles(await listModelProfiles());
       return true;
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to update model settings."
+        error instanceof Error ? error.message : "Failed to save model profile."
       );
       return false;
     } finally {
@@ -47,14 +52,48 @@ export function useModelSettings() {
     }
   }
 
+  async function handleDeleteProfile(profileId: string) {
+    setIsSaving(true);
+    setErrorMessage(null);
+
+    try {
+      setProfiles(await deleteModelProfile(profileId));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to delete model profile."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleSetDefaultProfile(profileId: string) {
+    setIsSaving(true);
+    setErrorMessage(null);
+
+    try {
+      setProfiles(await setDefaultModelProfile(profileId));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to set default model profile."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return {
-    settings,
+    profiles,
+    defaultProfile: profiles.find((profile) => profile.isDefault) ?? profiles[0] ?? null,
     errorMessage,
     isOpen,
     isLoading,
     isSaving,
     onOpen: () => setIsOpen(true),
     onClose: () => setIsOpen(false),
-    onSave: handleSaveSettings
+    onSaveProfile: handleSaveProfile,
+    onDeleteProfile: handleDeleteProfile,
+    onSetDefaultProfile: handleSetDefaultProfile,
+    onReload: loadSettingsEvent
   };
 }

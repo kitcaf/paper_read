@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
-import { useEffect } from "react";
+
+import { ModalRoot } from "./ModalRoot";
 
 interface ModalShellProps {
   open: boolean;
@@ -21,48 +22,21 @@ export function ModalShell({
   onClose,
   children
 }: ModalShellProps) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose, open]);
-
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <button
-        aria-label="Close modal"
-        className="absolute inset-0 bg-ink-900/28 backdrop-blur-[3px]"
-        type="button"
-        onClick={onClose}
-      />
-
-      <div
-        aria-modal="true"
-        className={[
+    <ModalRoot
+      ariaLabelledBy="modal-title"
+      className={[
           "relative w-full overflow-hidden rounded-[28px] border border-white/75 bg-paper-50/96 shadow-[0_24px_80px_rgba(24,37,47,0.18)] backdrop-blur-2xl",
           sizeClassName
         ].join(" ")}
-        role="dialog"
-      >
+      open={open}
+      onClose={onClose}
+    >
         <div className="flex items-start justify-between gap-4 border-b border-ink-300/30 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
+            <h2 className="text-lg font-semibold text-ink-900" id="modal-title">
+              {title}
+            </h2>
             {description ? (
               <p className="mt-1 text-sm leading-6 text-ink-500">{description}</p>
             ) : null}
@@ -83,7 +57,6 @@ export function ModalShell({
         {footer ? (
           <div className="border-t border-ink-300/30 px-5 py-4">{footer}</div>
         ) : null}
-      </div>
-    </div>
+    </ModalRoot>
   );
 }

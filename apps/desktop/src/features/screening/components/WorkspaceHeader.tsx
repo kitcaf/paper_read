@@ -1,4 +1,4 @@
-import { PanelLeft, PanelRight, SlidersHorizontal } from "lucide-react";
+import { PanelLeft, PanelRight } from "lucide-react";
 
 interface WorkspaceHeaderProps {
   title: string;
@@ -8,7 +8,6 @@ interface WorkspaceHeaderProps {
   isRightPanelCollapsed: boolean;
   onToggleLeftPanel: () => void;
   onToggleRightPanel: () => void;
-  onOpenModelSettings: () => void;
 }
 
 function getPanelControlClassName(isCollapsed: boolean) {
@@ -27,8 +26,7 @@ export function WorkspaceHeader({
   isLeftPanelCollapsed,
   isRightPanelCollapsed,
   onToggleLeftPanel,
-  onToggleRightPanel,
-  onOpenModelSettings
+  onToggleRightPanel
 }: WorkspaceHeaderProps) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-ink-300/35 bg-paper-50/55 px-3 md:px-4">
@@ -61,14 +59,6 @@ export function WorkspaceHeader({
             {sourceLabel}
           </span>
         ) : null}
-        <button
-          aria-label="Open model settings"
-          className={getPanelControlClassName(false)}
-          type="button"
-          onClick={onOpenModelSettings}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-        </button>
         <button
           aria-label={isRightPanelCollapsed ? "Show paper sidebar" : "Hide paper sidebar"}
           className={getPanelControlClassName(isRightPanelCollapsed)}

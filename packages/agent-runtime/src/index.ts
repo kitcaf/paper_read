@@ -11,7 +11,10 @@ import {
   createConversation,
   createMessage,
   createScreeningResult,
+  deleteModelProfile,
+  getModelProfileSettings,
   getModelProviderSettings,
+  listModelProfiles,
   listConversations,
   listMessages,
   listPapersBySource,
@@ -20,6 +23,8 @@ import {
   openWorkspaceStorage,
   updateConversationMetadata,
   updateModelProviderSettings,
+  setDefaultModelProfile,
+  upsertModelProfile,
   upsertPapers,
   type WorkspaceStorage
 } from "./storage/workspace";
@@ -137,6 +142,66 @@ async function handleModelSettingsUpdate(
   });
 }
 
+async function handleModelProfilesList(
+  command: Extract<AgentCommand, { type: "model.profiles.list" }>
+) {
+  const { db } = getWorkspaceStorage();
+
+  emit({
+    id: command.id,
+    type: "model.profiles.loaded",
+    payload: {
+      profiles: listModelProfiles(db)
+    }
+  });
+}
+
+async function handleModelProfilesUpsert(
+  command: Extract<AgentCommand, { type: "model.profiles.upsert" }>
+) {
+  const { db } = getWorkspaceStorage();
+  const profile = upsertModelProfile(db, command.payload.profile);
+
+  emit({
+    id: command.id,
+    type: "model.profile.upserted",
+    payload: {
+      profile
+    }
+  });
+}
+
+async function handleModelProfilesDelete(
+  command: Extract<AgentCommand, { type: "model.profiles.delete" }>
+) {
+  const { db } = getWorkspaceStorage();
+
+  emit({
+    id: command.id,
+    type: "model.profile.deleted",
+    payload: {
+      profileId: command.payload.profileId,
+      profiles: deleteModelProfile(db, command.payload.profileId)
+    }
+  });
+}
+
+async function handleModelProfilesSetDefault(
+  command: Extract<AgentCommand, { type: "model.profiles.set_default" }>
+) {
+  const { db } = getWorkspaceStorage();
+  const profile = setDefaultModelProfile(db, command.payload.profileId);
+
+  emit({
+    id: command.id,
+    type: "model.profile.default_set",
+    payload: {
+      profile,
+      profiles: listModelProfiles(db)
+    }
+  });
+}
+
 async function handleConversationList(
   command: Extract<AgentCommand, { type: "conversation.list" }>
 ) {
@@ -188,7 +253,8 @@ async function handleScreeningResultsGet(
 
 async function handleScreeningStart(command: Extract<AgentCommand, { type: "screening.start" }>) {
   const { db } = getWorkspaceStorage();
-  const modelRuntime = createModelRuntime(getModelProviderSettings(db));
+  const selectedModelProfile = getModelProfileSettings(db, command.payload.modelProfileId);
+  const modelRuntime = createModelRuntime(selectedModelProfile.settings);
   const papers = listPapersBySource(db, command.payload.sourceKey);
   const conversationId = createConversation(db, {
     title: command.payload.queryText.slice(0, 80),
@@ -197,6 +263,8 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
       sourceKey: command.payload.sourceKey,
       queryText: command.payload.queryText,
       inputMode: "title",
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name,
       options: command.payload.options ?? {},
       status: "running"
     }
@@ -208,6 +276,8 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
     metadata: {
       tool: "screening",
       sourceKey: command.payload.sourceKey,
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name,
       options: command.payload.options ?? {}
     }
   });
@@ -216,6 +286,8 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
     id: command.id,
     type: "model.provider_ready",
     payload: {
+      profileId: selectedModelProfile.profile.id,
+      profileName: selectedModelProfile.profile.name,
       provider: modelRuntime.provider.kind,
       modelName: modelRuntime.settings.modelName,
       ...(modelRuntime.settings.baseUrl ? { baseUrl: modelRuntime.settings.baseUrl } : {}),
@@ -246,6 +318,8 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
       focusTerms: intent.focusTerms,
       excludeTerms: intent.excludeTerms,
       provider: modelRuntime.provider.kind,
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name,
       modelName: modelRuntime.settings.modelName
     }
   });
@@ -315,6 +389,8 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
     totalCount: papers.length,
     matchedCount,
     modelProvider: modelRuntime.provider.kind,
+    modelProfileId: selectedModelProfile.profile.id,
+    modelProfileName: selectedModelProfile.profile.name,
     modelName: modelRuntime.settings.modelName
   });
 
@@ -345,6 +421,18 @@ async function handleCommand(command: AgentCommand) {
       break;
     case "model.settings.update":
       await handleModelSettingsUpdate(command);
+      break;
+    case "model.profiles.list":
+      await handleModelProfilesList(command);
+      break;
+    case "model.profiles.upsert":
+      await handleModelProfilesUpsert(command);
+      break;
+    case "model.profiles.delete":
+      await handleModelProfilesDelete(command);
+      break;
+    case "model.profiles.set_default":
+      await handleModelProfilesSetDefault(command);
       break;
     case "conversation.list":
       await handleConversationList(command);

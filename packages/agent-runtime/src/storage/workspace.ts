@@ -6,6 +6,8 @@ import type {
   LocalConversationSummary,
   LocalMessageRecord,
   LocalScreeningResultRecord,
+  ModelProviderProfile,
+  ModelProviderProfileInput,
   ModelProviderSettings,
   PaperRecord,
   ScreeningDecision,
@@ -14,8 +16,10 @@ import type {
 
 import {
   DEFAULT_MODEL_PROVIDER_SETTINGS,
-  normalizeModelProviderSettings
+  normalizeModelProviderSettings,
+  toPublicModelProviderSettings
 } from "../models/config";
+import type { RequiredModelProviderSettings } from "../models/types";
 import { SQLITE_SCHEMA } from "./schema";
 
 export interface StoredPaperRow {
@@ -26,6 +30,22 @@ export interface StoredPaperRow {
   abstract: string | null;
   metadata_json: string;
   created_at: string;
+}
+
+interface StoredModelProfileRow {
+  id: string;
+  name: string;
+  provider: RequiredModelProviderSettings["provider"];
+  model_name: string;
+  base_url: string | null;
+  api_key: string | null;
+  temperature: number;
+  max_tokens: number;
+  response_format: RequiredModelProviderSettings["responseFormat"];
+  stream: number;
+  is_default: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface WorkspaceStorage {
@@ -175,6 +195,27 @@ function mapPaperRow(row: StoredPaperRow): PaperRecord {
   };
 }
 
+function mapModelProfileRow(row: StoredModelProfileRow): ModelProviderProfile {
+  const settings = normalizeModelProviderSettings({
+    provider: row.provider,
+    modelName: row.model_name,
+    ...(row.base_url ? { baseUrl: row.base_url } : {}),
+    ...(row.api_key ? { apiKey: row.api_key } : {}),
+    temperature: row.temperature,
+    maxTokens: row.max_tokens,
+    responseFormat: row.response_format
+  });
+
+  return {
+    id: row.id,
+    name: row.name,
+    isDefault: Boolean(row.is_default),
+    settings: toPublicModelProviderSettings(settings),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export function upsertPapers(db: Database, papers: ImportPaperInput[]) {
   const timestamp = nowIso();
   const selectExistingPaper = db.prepare<
@@ -226,17 +267,15 @@ export function upsertPapers(db: Database, papers: ImportPaperInput[]) {
 }
 
 export function getModelProviderSettings(db: Database) {
+  return getModelProfileSettings(db).settings;
+}
+
+function getLegacyModelProviderSettings(db: Database) {
   const row = db
-    .query<{ value_json: string }, [string]>(
-      "SELECT value_json FROM settings WHERE key = ?"
-    )
+    .query<{ value_json: string }, [string]>("SELECT value_json FROM settings WHERE key = ?")
     .get("model.provider");
 
-  if (!row) {
-    return DEFAULT_MODEL_PROVIDER_SETTINGS;
-  }
-
-  return normalizeModelProviderSettings(parseJsonRecord(row.value_json));
+  return row ? normalizeModelProviderSettings(parseJsonRecord(row.value_json)) : null;
 }
 
 export function updateModelProviderSettings(
@@ -244,22 +283,224 @@ export function updateModelProviderSettings(
   settings: ModelProviderSettings
 ) {
   const currentSettings = getModelProviderSettings(db);
-  const normalizedSettings = normalizeModelProviderSettings({
-    ...settings,
-    apiKey: settings.apiKey ?? currentSettings.apiKey
+  const defaultProfile = getDefaultModelProfile(db);
+  const updatedProfile = upsertModelProfile(db, {
+    id: defaultProfile.id,
+    name: defaultProfile.name,
+    isDefault: true,
+    settings: {
+      ...settings,
+      apiKey: settings.apiKey ?? currentSettings.apiKey
+    }
   });
+
+  return getModelProfileSettings(db, updatedProfile.id).settings;
+}
+
+export function ensureDefaultModelProfile(db: Database) {
+  const count = db.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM model_profiles").get();
+  if (count && count.count > 0) {
+    return;
+  }
+
+  const legacySettings = getLegacyModelProviderSettings(db);
+  const defaultSettings = legacySettings ?? DEFAULT_MODEL_PROVIDER_SETTINGS;
+  const timestamp = nowIso();
 
   db.query(
     `
-    INSERT INTO settings (key, value_json, updated_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET
-      value_json = excluded.value_json,
-      updated_at = excluded.updated_at
+    INSERT INTO model_profiles (
+      id, name, provider, model_name, base_url, api_key, temperature, max_tokens,
+      response_format, stream, is_default, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
-  ).run("model.provider", JSON.stringify(normalizedSettings), nowIso());
+  ).run(
+    crypto.randomUUID(),
+    "Default model",
+    defaultSettings.provider,
+    defaultSettings.modelName,
+    defaultSettings.baseUrl ?? null,
+    defaultSettings.apiKey ?? null,
+    defaultSettings.temperature,
+    defaultSettings.maxTokens,
+    defaultSettings.responseFormat,
+    defaultSettings.stream ? 1 : 0,
+    1,
+    timestamp,
+    timestamp
+  );
+}
 
-  return normalizedSettings;
+function listModelProfileRows(db: Database) {
+  ensureDefaultModelProfile(db);
+
+  return db
+    .query<StoredModelProfileRow, []>(
+      `
+      SELECT
+        id, name, provider, model_name, base_url, api_key, temperature,
+        max_tokens, response_format, stream, is_default, created_at, updated_at
+      FROM model_profiles
+      ORDER BY is_default DESC, updated_at DESC, name ASC
+      `
+    )
+    .all();
+}
+
+function getModelProfileRowById(db: Database, profileId: string) {
+  ensureDefaultModelProfile(db);
+
+  return db
+    .query<StoredModelProfileRow, [string]>(
+      `
+      SELECT
+        id, name, provider, model_name, base_url, api_key, temperature,
+        max_tokens, response_format, stream, is_default, created_at, updated_at
+      FROM model_profiles
+      WHERE id = ?
+      `
+    )
+    .get(profileId);
+}
+
+export function listModelProfiles(db: Database): ModelProviderProfile[] {
+  return listModelProfileRows(db).map(mapModelProfileRow);
+}
+
+export function getDefaultModelProfile(db: Database) {
+  const rows = listModelProfileRows(db);
+  const defaultRow = rows.find((row) => Boolean(row.is_default)) ?? rows[0];
+  if (!defaultRow) {
+    throw new Error("No model profile is available.");
+  }
+
+  return mapModelProfileRow(defaultRow);
+}
+
+export function getModelProfileSettings(db: Database, profileId?: string) {
+  ensureDefaultModelProfile(db);
+  const profileRow = profileId
+    ? getModelProfileRowById(db, profileId)
+    : listModelProfileRows(db).find((item) => Boolean(item.is_default)) ??
+      listModelProfileRows(db)[0];
+
+  if (!profileRow) {
+    throw new Error(profileId ? "Model profile not found." : "No model profile is available.");
+  }
+
+  return {
+    profile: mapModelProfileRow(profileRow),
+    settings: normalizeModelProviderSettings({
+      provider: profileRow.provider,
+      modelName: profileRow.model_name,
+      ...(profileRow.base_url ? { baseUrl: profileRow.base_url } : {}),
+      ...(profileRow.api_key ? { apiKey: profileRow.api_key } : {}),
+      temperature: profileRow.temperature,
+      maxTokens: profileRow.max_tokens,
+      responseFormat: profileRow.response_format
+    })
+  };
+}
+
+export function upsertModelProfile(
+  db: Database,
+  profile: ModelProviderProfileInput
+): ModelProviderProfile {
+  ensureDefaultModelProfile(db);
+  const existingProfileRow = profile.id ? getModelProfileRowById(db, profile.id) : null;
+  const existingSettings = existingProfileRow
+    ? getModelProfileSettings(db, existingProfileRow.id).settings
+    : null;
+  const timestamp = nowIso();
+  const profileId = profile.id ?? crypto.randomUUID();
+  const normalizedSettings = normalizeModelProviderSettings({
+    ...profile.settings,
+    apiKey: profile.settings.apiKey ?? existingSettings?.apiKey
+  });
+  const shouldBeDefault = Boolean(profile.isDefault) || !listModelProfiles(db).length;
+
+  const writeProfile = db.transaction(() => {
+    if (shouldBeDefault) {
+      db.query("UPDATE model_profiles SET is_default = 0").run();
+    }
+
+    db.query(
+      `
+      INSERT INTO model_profiles (
+        id, name, provider, model_name, base_url, api_key, temperature, max_tokens,
+        response_format, stream, is_default, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        provider = excluded.provider,
+        model_name = excluded.model_name,
+        base_url = excluded.base_url,
+        api_key = excluded.api_key,
+        temperature = excluded.temperature,
+        max_tokens = excluded.max_tokens,
+        response_format = excluded.response_format,
+        stream = excluded.stream,
+        is_default = excluded.is_default,
+        updated_at = excluded.updated_at
+      `
+    ).run(
+      profileId,
+      profile.name.trim() || normalizedSettings.modelName,
+      normalizedSettings.provider,
+      normalizedSettings.modelName,
+      normalizedSettings.baseUrl ?? null,
+      normalizedSettings.apiKey ?? null,
+      normalizedSettings.temperature,
+      normalizedSettings.maxTokens,
+      normalizedSettings.responseFormat,
+      normalizedSettings.stream ? 1 : 0,
+      shouldBeDefault ? 1 : 0,
+      existingProfileRow?.created_at ?? timestamp,
+      timestamp
+    );
+  });
+
+  writeProfile();
+  return getModelProfileSettings(db, profileId).profile;
+}
+
+export function deleteModelProfile(db: Database, profileId: string) {
+  ensureDefaultModelProfile(db);
+  const profile = getModelProfileSettings(db, profileId).profile;
+
+  db.query("DELETE FROM model_profiles WHERE id = ?").run(profileId);
+  const remainingProfiles = listModelProfiles(db);
+
+  if (!remainingProfiles.length) {
+    ensureDefaultModelProfile(db);
+    return listModelProfiles(db);
+  }
+
+  if (profile.isDefault && remainingProfiles[0]) {
+    setDefaultModelProfile(db, remainingProfiles[0].id);
+  }
+
+  return listModelProfiles(db);
+}
+
+export function setDefaultModelProfile(db: Database, profileId: string) {
+  const profile = getModelProfileSettings(db, profileId).profile;
+
+  const setDefault = db.transaction(() => {
+    db.query("UPDATE model_profiles SET is_default = 0").run();
+    db.query("UPDATE model_profiles SET is_default = 1, updated_at = ? WHERE id = ?").run(
+      nowIso(),
+      profileId
+    );
+  });
+
+  setDefault();
+  return {
+    ...profile,
+    isDefault: true
+  };
 }
 
 export function createConversation(
