@@ -2,7 +2,7 @@ import type { SourceSummary } from "@paper-read/shared";
 import { Check, Database } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { ModalShell } from "../../../components/layout/ModalShell";
+import { ModalShell } from "../../../components/ModalShell";
 
 interface ScreeningSourceDialogProps {
   open: boolean;

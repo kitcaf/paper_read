@@ -3,12 +3,15 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { stdin } from "node:process";
 
-import { analyzeIntent, scorePaperTitle } from "./screening";
+import { toPublicModelProviderSettings } from "./models/config";
+import { createModelRuntime } from "./models/registry";
+import { analyzeIntentWithModel, scorePaperWithModel } from "./screeningModel";
 import { INITIAL_PAPERS, INITIAL_SOURCE_KEY } from "./source-data/initialPapers";
 import {
   createConversation,
   createMessage,
   createScreeningResult,
+  getModelProviderSettings,
   listConversations,
   listMessages,
   listPapersBySource,
@@ -16,6 +19,7 @@ import {
   listSourceSummaries,
   openWorkspaceStorage,
   updateConversationMetadata,
+  updateModelProviderSettings,
   upsertPapers,
   type WorkspaceStorage
 } from "./storage/workspace";
@@ -103,6 +107,36 @@ async function handleSourcesImportSeed(
   });
 }
 
+async function handleModelSettingsGet(
+  command: Extract<AgentCommand, { type: "model.settings.get" }>
+) {
+  const { db } = getWorkspaceStorage();
+  const settings = getModelProviderSettings(db);
+
+  emit({
+    id: command.id,
+    type: "model.settings.loaded",
+    payload: {
+      settings: toPublicModelProviderSettings(settings)
+    }
+  });
+}
+
+async function handleModelSettingsUpdate(
+  command: Extract<AgentCommand, { type: "model.settings.update" }>
+) {
+  const { db } = getWorkspaceStorage();
+  const settings = updateModelProviderSettings(db, command.payload.settings);
+
+  emit({
+    id: command.id,
+    type: "model.settings.updated",
+    payload: {
+      settings: toPublicModelProviderSettings(settings)
+    }
+  });
+}
+
 async function handleConversationList(
   command: Extract<AgentCommand, { type: "conversation.list" }>
 ) {
@@ -154,6 +188,7 @@ async function handleScreeningResultsGet(
 
 async function handleScreeningStart(command: Extract<AgentCommand, { type: "screening.start" }>) {
   const { db } = getWorkspaceStorage();
+  const modelRuntime = createModelRuntime(getModelProviderSettings(db));
   const papers = listPapersBySource(db, command.payload.sourceKey);
   const conversationId = createConversation(db, {
     title: command.payload.queryText.slice(0, 80),
@@ -179,6 +214,17 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
 
   emit({
     id: command.id,
+    type: "model.provider_ready",
+    payload: {
+      provider: modelRuntime.provider.kind,
+      modelName: modelRuntime.settings.modelName,
+      ...(modelRuntime.settings.baseUrl ? { baseUrl: modelRuntime.settings.baseUrl } : {}),
+      isFallback: modelRuntime.provider.kind === "mock"
+    }
+  });
+
+  emit({
+    id: command.id,
     type: "screening.started",
     payload: {
       conversationId,
@@ -188,7 +234,7 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
     }
   });
 
-  const intent = analyzeIntent(command.payload.queryText);
+  const intent = await analyzeIntentWithModel(modelRuntime, command.payload.queryText);
   createMessage(db, {
     conversationId,
     role: "tool",
@@ -197,7 +243,10 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
       tool: "screening",
       step: "intent_analyzed",
       summary: intent.summary,
-      focusTerms: intent.focusTerms
+      focusTerms: intent.focusTerms,
+      excludeTerms: intent.excludeTerms,
+      provider: modelRuntime.provider.kind,
+      modelName: modelRuntime.settings.modelName
     }
   });
 
@@ -213,7 +262,7 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
 
   let matchedCount = 0;
   for (const paper of papers) {
-    const scoredPaper = scorePaperTitle(command.payload.queryText, paper);
+    const scoredPaper = await scorePaperWithModel(modelRuntime, command.payload.queryText, paper);
     if (scoredPaper.decision === "keep") {
       matchedCount += 1;
     }
@@ -226,7 +275,8 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
       score: scoredPaper.score,
       reasoning: scoredPaper.reasoning,
       metadata: {
-        mode: "title"
+        mode: "title",
+        ...scoredPaper.metadata
       }
     });
 
@@ -261,8 +311,11 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
     status: "completed",
     intentSummary: intent.summary,
     focusTerms: intent.focusTerms,
+    excludeTerms: intent.excludeTerms,
     totalCount: papers.length,
-    matchedCount
+    matchedCount,
+    modelProvider: modelRuntime.provider.kind,
+    modelName: modelRuntime.settings.modelName
   });
 
   emit({
@@ -286,6 +339,12 @@ async function handleCommand(command: AgentCommand) {
       break;
     case "sources.list":
       await handleSourcesList(command);
+      break;
+    case "model.settings.get":
+      await handleModelSettingsGet(command);
+      break;
+    case "model.settings.update":
+      await handleModelSettingsUpdate(command);
       break;
     case "conversation.list":
       await handleConversationList(command);

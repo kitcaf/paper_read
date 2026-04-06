@@ -6,11 +6,16 @@ import type {
   LocalConversationSummary,
   LocalMessageRecord,
   LocalScreeningResultRecord,
+  ModelProviderSettings,
   PaperRecord,
   ScreeningDecision,
   SourceSummary
 } from "@paper-read/shared";
 
+import {
+  DEFAULT_MODEL_PROVIDER_SETTINGS,
+  normalizeModelProviderSettings
+} from "../models/config";
 import { SQLITE_SCHEMA } from "./schema";
 
 export interface StoredPaperRow {
@@ -49,6 +54,18 @@ function parseMetadata(value: string) {
     return JSON.parse(value) as Record<string, unknown>;
   } catch (error) {
     console.warn("Failed to parse local metadata JSON.", error);
+    return {};
+  }
+}
+
+function parseJsonRecord(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch (error) {
+    console.warn("Failed to parse local setting JSON.", error);
     return {};
   }
 }
@@ -206,6 +223,39 @@ export function upsertPapers(db: Database, papers: ImportPaperInput[]) {
   });
 
   upsertMany(papers);
+}
+
+export function getModelProviderSettings(db: Database) {
+  const row = db
+    .query<{ value_json: string }, [string]>(
+      "SELECT value_json FROM settings WHERE key = ?"
+    )
+    .get("model.provider");
+
+  if (!row) {
+    return DEFAULT_MODEL_PROVIDER_SETTINGS;
+  }
+
+  return normalizeModelProviderSettings(parseJsonRecord(row.value_json));
+}
+
+export function updateModelProviderSettings(
+  db: Database,
+  settings: ModelProviderSettings
+) {
+  const normalizedSettings = normalizeModelProviderSettings(settings);
+
+  db.query(
+    `
+    INSERT INTO settings (key, value_json, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      value_json = excluded.value_json,
+      updated_at = excluded.updated_at
+    `
+  ).run("model.provider", JSON.stringify(normalizedSettings), nowIso());
+
+  return normalizedSettings;
 }
 
 export function createConversation(

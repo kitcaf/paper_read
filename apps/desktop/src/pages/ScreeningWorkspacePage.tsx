@@ -2,9 +2,10 @@ import { HistorySidebar } from "../features/screening/components/HistorySidebar"
 import { QueryComposer } from "../features/screening/components/QueryComposer";
 import { QueryStatusPanel } from "../features/screening/components/QueryStatusPanel";
 import { ResultsPanel } from "../features/screening/components/ResultsPanel";
+import { WorkspaceHeader } from "../features/screening/components/WorkspaceHeader";
 import { useScreeningWorkspace } from "../features/screening/hooks/useScreeningWorkspace";
 import { formatSourceLabel } from "../features/screening/presentation";
-import { AppLayout } from "../layout";
+import { AppLayout } from "../layout/AppLayout";
 
 export function ScreeningWorkspacePage() {
   const {
@@ -24,9 +25,27 @@ export function ScreeningWorkspacePage() {
     onStartNewChat,
     onRefreshCurrentQuery
   } = useScreeningWorkspace();
+  const currentSourceLabel = selectedQuery
+    ? formatSourceLabel(selectedQuery.sourceKey, sources)
+    : null;
 
   return (
     <AppLayout
+      header={({
+        isLeftPanelCollapsed,
+        isRightPanelCollapsed,
+        onToggleLeftPanel,
+        onToggleRightPanel
+      }) => (
+        <WorkspaceHeader
+          title={selectedQuery?.queryTitle ?? "新对话"}
+          sourceLabel={currentSourceLabel}
+          isLeftPanelCollapsed={isLeftPanelCollapsed}
+          isRightPanelCollapsed={isRightPanelCollapsed}
+          onToggleLeftPanel={onToggleLeftPanel}
+          onToggleRightPanel={onToggleRightPanel}
+        />
+      )}
       sidebar={({ onToggleSidebar }) => (
         <HistorySidebar
           queries={queryHistory}
@@ -38,20 +57,7 @@ export function ScreeningWorkspacePage() {
         />
       )}
       main={
-        <section className="relative flex min-h-screen min-w-0 flex-col">
-          <header className="flex h-14 items-center justify-between gap-4 border-b border-ink-300/35 bg-paper-50/55 px-4 md:px-6">
-            <h1 className="truncate text-sm font-medium text-ink-900">
-              {selectedQuery?.queryTitle ?? "新对话"}
-            </h1>
-            <div className="flex shrink-0 items-center gap-3 text-xs text-ink-500">
-              {selectedQuery ? (
-                <span className="rounded-full border border-ink-300/55 px-3 py-1">
-                  {formatSourceLabel(selectedQuery.sourceKey, sources)}
-                </span>
-              ) : null}
-            </div>
-          </header>
-
+        <section className="relative flex h-full min-w-0 flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto pb-[168px] md:pb-[182px]">
             {errorMessage ? (
               <div className="border-b border-coral-500/20 bg-coral-500/8 px-6 py-3 text-sm text-coral-500">

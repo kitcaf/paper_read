@@ -112,8 +112,11 @@ export function useResizableAppLayout() {
     startClientX: number;
     startWidths: LayoutWidths;
   } | null>(null);
+  const containerWidthRef = useRef(0);
+  const layoutWidthsRef = useRef<LayoutWidths | null>(null);
+  const pendingWidthsRef = useRef<LayoutWidths | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
-  const [containerWidth, setContainerWidth] = useState(0);
   const [layoutWidths, setLayoutWidths] = useState<LayoutWidths>(() => {
     return (
       readStoredWidths() ?? {
@@ -124,6 +127,41 @@ export function useResizableAppLayout() {
       }
     );
   });
+  const [isResizing, setIsResizing] = useState(false);
+
+  if (!layoutWidthsRef.current) {
+    layoutWidthsRef.current = layoutWidths;
+  }
+
+  const applyLayoutWidthVariables = useCallback((widths: LayoutWidths) => {
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
+
+    element.style.setProperty("--left-panel-width", `${widths.leftWidth}px`);
+    element.style.setProperty("--right-panel-width", `${widths.rightWidth}px`);
+  }, []);
+
+  const scheduleLayoutWidthVariables = useCallback(
+    (widths: LayoutWidths) => {
+      pendingWidthsRef.current = widths;
+      layoutWidthsRef.current = widths;
+
+      if (animationFrameRef.current !== null) {
+        return;
+      }
+
+      animationFrameRef.current = window.requestAnimationFrame(() => {
+        animationFrameRef.current = null;
+
+        if (pendingWidthsRef.current) {
+          applyLayoutWidthVariables(pendingWidthsRef.current);
+        }
+      });
+    },
+    [applyLayoutWidthVariables]
+  );
 
   useEffect(() => {
     const element = containerRef.current;
@@ -137,8 +175,13 @@ export function useResizableAppLayout() {
         return;
       }
 
-      setContainerWidth(nextWidth);
-      setLayoutWidths((currentWidths) => clampLayoutWidths(nextWidth, currentWidths));
+      containerWidthRef.current = nextWidth;
+      setLayoutWidths((currentWidths) => {
+        const nextWidths = clampLayoutWidths(nextWidth, currentWidths);
+        layoutWidthsRef.current = nextWidths;
+        applyLayoutWidthVariables(nextWidths);
+        return nextWidths;
+      });
     });
 
     resizeObserver.observe(element);
@@ -146,56 +189,80 @@ export function useResizableAppLayout() {
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [applyLayoutWidthVariables]);
 
   useEffect(() => {
+    layoutWidthsRef.current = layoutWidths;
+    applyLayoutWidthVariables(layoutWidths);
     writeStoredWidths(layoutWidths);
-  }, [layoutWidths]);
+  }, [applyLayoutWidthVariables, layoutWidths]);
 
   const handlePointerMove = useCallback(
     (event: PointerEvent) => {
       const dragState = dragStateRef.current;
+      const containerWidth = containerWidthRef.current;
       if (!dragState || !containerWidth) {
         return;
       }
 
-      setLayoutWidths(() => {
-        if (dragState.column === "left") {
-          const nextLeftWidth =
-            dragState.startWidths.leftWidth + (event.clientX - dragState.startClientX);
+      if (dragState.column === "left") {
+        const nextLeftWidth =
+          dragState.startWidths.leftWidth + (event.clientX - dragState.startClientX);
 
-          return clampLayoutWidths(containerWidth, {
+        scheduleLayoutWidthVariables(
+          clampLayoutWidths(containerWidth, {
             leftWidth: nextLeftWidth,
             rightWidth: dragState.startWidths.rightWidth,
             isLeftPanelCollapsed: false,
             isRightPanelCollapsed: dragState.startWidths.isRightPanelCollapsed
-          });
-        }
+          })
+        );
+        return;
+      }
 
-        const nextRightWidth =
-          dragState.startWidths.rightWidth + (dragState.startClientX - event.clientX);
+      const nextRightWidth =
+        dragState.startWidths.rightWidth + (dragState.startClientX - event.clientX);
 
-        return clampLayoutWidths(containerWidth, {
+      scheduleLayoutWidthVariables(
+        clampLayoutWidths(containerWidth, {
           leftWidth: dragState.startWidths.leftWidth,
           rightWidth: nextRightWidth,
           isLeftPanelCollapsed: dragState.startWidths.isLeftPanelCollapsed,
           isRightPanelCollapsed: false
-        });
-      });
+        })
+      );
     },
-    [containerWidth]
+    [scheduleLayoutWidthVariables]
   );
 
   const handlePointerUp = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    const nextWidths = pendingWidthsRef.current ?? layoutWidthsRef.current;
+    pendingWidthsRef.current = null;
     dragStateRef.current = null;
+    setIsResizing(false);
+
+    if (nextWidths) {
+      applyLayoutWidthVariables(nextWidths);
+      setLayoutWidths(nextWidths);
+    }
+
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
     window.removeEventListener("pointermove", handlePointerMove);
     window.removeEventListener("pointerup", handlePointerUp);
-  }, [handlePointerMove]);
+  }, [applyLayoutWidthVariables, handlePointerMove]);
 
   useEffect(() => {
     return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       window.removeEventListener("pointermove", handlePointerMove);
@@ -205,24 +272,36 @@ export function useResizableAppLayout() {
 
   const handleStartResizing = useCallback(
     (column: ResizeColumn, clientX: number) => {
+      const startWidths = layoutWidthsRef.current;
+      if (!startWidths) {
+        return;
+      }
+
       dragStateRef.current = {
         column,
         startClientX: clientX,
-        startWidths: layoutWidths
+        startWidths
       };
+      pendingWidthsRef.current = startWidths;
 
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
+      setIsResizing(true);
       window.addEventListener("pointermove", handlePointerMove);
       window.addEventListener("pointerup", handlePointerUp);
     },
-    [handlePointerMove, handlePointerUp, layoutWidths]
+    [handlePointerMove, handlePointerUp]
   );
 
   const handleResetWidth = useCallback(
     (column: ResizeColumn) => {
+      const currentContainerWidth = containerWidthRef.current;
+      if (!currentContainerWidth) {
+        return;
+      }
+
       setLayoutWidths((currentWidths) =>
-        clampLayoutWidths(containerWidth, {
+        clampLayoutWidths(currentContainerWidth, {
           leftWidth:
             column === "left" ? DEFAULT_LEFT_WIDTH_PX : currentWidths.leftWidth,
           rightWidth:
@@ -232,7 +311,7 @@ export function useResizableAppLayout() {
         })
       );
     },
-    [containerWidth]
+    []
   );
 
   const handleTogglePanel = useCallback((column: ResizeColumn) => {
@@ -257,6 +336,7 @@ export function useResizableAppLayout() {
     rightWidth: layoutWidths.rightWidth,
     isLeftPanelCollapsed: layoutWidths.isLeftPanelCollapsed,
     isRightPanelCollapsed: layoutWidths.isRightPanelCollapsed,
+    isResizing,
     handleStartResizing,
     handleResetWidth,
     handleTogglePanel
