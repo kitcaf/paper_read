@@ -1,4 +1,5 @@
 import type { ModelGenerateRequest, ModelGenerateResponse, ModelRuntime } from "./types";
+import { ModelProviderHttpError } from "./http";
 
 export interface ModelGenerateWithFallbackResponse extends ModelGenerateResponse {
   usedStreamingFallback: boolean;
@@ -19,6 +20,10 @@ export async function generateWithStreamingFallback(
       throw streamingError;
     }
 
+    if (streamingError instanceof ModelProviderHttpError && streamingError.status !== 400) {
+      throw streamingError;
+    }
+
     const fallbackRequest = {
       ...request,
       stream: false
@@ -33,9 +38,9 @@ export async function generateWithStreamingFallback(
       };
     } catch (fallbackError) {
       throw new Error(
-        `Streaming and non-streaming model calls failed. Streaming: ${
+        `模型流式请求和非流式降级请求都失败。流式错误：${
           streamingError instanceof Error ? streamingError.message : String(streamingError)
-        }; Non-streaming: ${
+        }；非流式错误：${
           fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
         }`
       );

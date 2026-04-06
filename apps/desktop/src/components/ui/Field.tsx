@@ -11,7 +11,7 @@ const CONTROL_CLASS_NAME =
 
 export function Field({ label, description, children }: FieldProps) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-ink-700">
+    <label className="grid min-w-0 gap-2 text-sm font-medium text-ink-700">
       <span>{label}</span>
       {children}
       {description ? <span className="text-xs font-normal text-ink-500">{description}</span> : null}
@@ -20,12 +20,12 @@ export function Field({ label, description, children }: FieldProps) {
 }
 
 export function TextInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={[CONTROL_CLASS_NAME, className].join(" ")} {...props} />;
+  return <input className={[CONTROL_CLASS_NAME, "min-w-0", className].join(" ")} {...props} />;
 }
 
 export function SelectInput({
   className = "",
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={[CONTROL_CLASS_NAME, className].join(" ")} {...props} />;
+  return <select className={[CONTROL_CLASS_NAME, "min-w-0", className].join(" ")} {...props} />;
 }

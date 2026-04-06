@@ -1,5 +1,19 @@
 const HTTP_OK_MIN = 200;
 const HTTP_OK_MAX = 299;
+const AUTHENTICATION_STATUS_CODES = new Set([401, 403]);
+const ERROR_PREVIEW_MAX_LENGTH = 260;
+
+export class ModelProviderHttpError extends Error {
+  readonly status: number;
+  readonly providerName: string;
+
+  constructor(providerName: string, status: number, message: string) {
+    super(message);
+    this.name = "ModelProviderHttpError";
+    this.providerName = providerName;
+    this.status = status;
+  }
+}
 
 export function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/u, "");
@@ -23,15 +37,66 @@ export async function readJsonResponse(response: Response) {
   }
 }
 
+function readProviderErrorMessage(responseBody: string) {
+  if (!responseBody.trim()) {
+    return "";
+  }
+
+  try {
+    const parsedBody = JSON.parse(responseBody) as unknown;
+    if (!parsedBody || typeof parsedBody !== "object") {
+      return responseBody;
+    }
+
+    const errorPayload = "error" in parsedBody ? parsedBody.error : parsedBody;
+    if (!errorPayload || typeof errorPayload !== "object") {
+      return responseBody;
+    }
+
+    const message = "message" in errorPayload ? errorPayload.message : undefined;
+    const code = "code" in errorPayload ? errorPayload.code : undefined;
+
+    return [
+      typeof message === "string" ? message : "",
+      typeof code === "string" && code ? `Code: ${code}` : ""
+    ]
+      .filter(Boolean)
+      .join(" ");
+  } catch {
+    return responseBody;
+  }
+}
+
+function sanitizeProviderErrorMessage(value: string) {
+  return value
+    .replace(/api key:\s*[^,\s"]+/giu, "api key: [redacted]")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gu, "Bearer [redacted]")
+    .replace(/sk-[A-Za-z0-9._-]+/gu, "sk-[redacted]")
+    .slice(0, ERROR_PREVIEW_MAX_LENGTH);
+}
+
 export async function ensureOkResponse(response: Response, providerName: string) {
   if (response.status >= HTTP_OK_MIN && response.status <= HTTP_OK_MAX) {
     return;
   }
 
   const responseBody = await response.text();
-  throw new Error(
-    `${providerName} request failed with HTTP ${response.status}: ${
-      responseBody || response.statusText
+  if (AUTHENTICATION_STATUS_CODES.has(response.status)) {
+    throw new ModelProviderHttpError(
+      providerName,
+      response.status,
+      `${providerName} authentication failed (HTTP ${response.status}). 请检查 API Key、Base URL 和模型名称。`
+    );
+  }
+
+  const providerMessage = sanitizeProviderErrorMessage(
+    readProviderErrorMessage(responseBody) || response.statusText
+  );
+  throw new ModelProviderHttpError(
+    providerName,
+    response.status,
+    `${providerName} request failed with HTTP ${response.status}${
+      providerMessage ? `: ${providerMessage}` : "."
     }`
   );
 }

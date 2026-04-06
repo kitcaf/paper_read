@@ -17,7 +17,7 @@ export function ModelProfileList({
   onSelectProfile
 }: ModelProfileListProps) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       {isLoading ? (
         <div className="rounded-2xl border border-ink-300/35 bg-white/70 px-4 py-5 text-sm text-ink-500">
           正在加载模型配置...
@@ -32,7 +32,7 @@ export function ModelProfileList({
           <button
             key={profile.id}
             className={[
-              "w-full rounded-2xl border px-4 py-3 text-left transition",
+              "w-full min-w-0 rounded-2xl border px-4 py-3 text-left transition",
               isSelected
                 ? "border-ink-900/20 bg-white shadow-[0_12px_28px_rgba(24,37,47,0.08)]"
                 : "border-ink-300/35 bg-white/65 hover:bg-white"

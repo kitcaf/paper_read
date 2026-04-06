@@ -27,7 +27,7 @@ export function ModelConnectionStatus({ isTesting, result }: ModelConnectionStat
   return (
     <div
       className={[
-        "flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm",
+        "flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3 text-sm",
         result.ok
           ? "border-emerald-500/20 bg-emerald-500/8 text-emerald-700"
           : "border-coral-500/20 bg-coral-500/8 text-coral-500"
@@ -38,9 +38,11 @@ export function ModelConnectionStatus({ isTesting, result }: ModelConnectionStat
       ) : (
         <CircleAlert className="mt-0.5 h-4 w-4" />
       )}
-      <div className="min-w-0">
-        <p className="font-medium">{result.message}</p>
-        <p className="mt-1 text-xs opacity-80">
+      <div className="min-w-0 flex-1">
+        <p className="max-h-28 overflow-y-auto whitespace-pre-wrap break-words font-medium leading-6 [overflow-wrap:anywhere]">
+          {result.message}
+        </p>
+        <p className="mt-1 truncate text-xs opacity-80">
           {result.provider} · {result.modelName} · {result.latencyMs}ms
         </p>
       </div>

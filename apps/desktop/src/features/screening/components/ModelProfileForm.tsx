@@ -48,7 +48,7 @@ export function ModelProfileForm({
   const isBusy = isSaving || isTesting;
 
   return (
-    <div className="rounded-[24px] border border-ink-300/35 bg-white/78 p-4 shadow-[0_14px_36px_rgba(24,37,47,0.06)]">
+    <div className="min-w-0 overflow-hidden rounded-[24px] border border-ink-300/35 bg-white/78 p-4 shadow-[0_14px_36px_rgba(24,37,47,0.06)]">
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
           <Field label="配置名称">

@@ -39,7 +39,7 @@ export function ModalRoot({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-3 sm:p-5">
       <button
         aria-label="Close modal"
         className="absolute inset-0 bg-ink-900/28 backdrop-blur-[3px]"
