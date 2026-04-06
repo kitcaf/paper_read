@@ -1,0 +1,31 @@
+{
+  "name": "@paper-read/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "pnpm --filter @paper-read/agent-runtime compile && tauri dev",
+    "tauri:build": "pnpm --filter @paper-read/agent-runtime compile && tauri build"
+  },
+  "dependencies": {
+    "@paper-read/shared": "workspace:*",
+    "@tauri-apps/api": "^2.0.0",
+    "lucide-react": "^1.7.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@tauri-apps/cli": "^2.0.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.1.13",
+    "vite": "^8.0.3"
+  }
+}

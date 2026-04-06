@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true,
@@ -11,6 +12,15 @@
     "paths": {
       "@paper-read/shared": [
         "packages/shared/src/index.ts"
+      ],
+      "@paper-read/agent-runtime": [
+        "packages/agent-runtime/src/index.ts"
+      ],
+      "@paper-read/source-connectors": [
+        "packages/source-connectors/src/index.ts"
+      ],
+      "@paper-read/prompt-spec": [
+        "packages/prompt-spec/src/index.ts"
       ]
     }
   }

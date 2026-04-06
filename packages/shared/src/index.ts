@@ -122,3 +122,132 @@ export interface ScreeningResultsSummary {
 export interface ScreeningResultsPage extends PaginatedResponse<ScreeningResultItem> {
   summary: ScreeningResultsSummary;
 }
+
+export type AgentCommandType =
+  | "workspace.open"
+  | "sources.import_seed"
+  | "sources.list"
+  | "screening.start"
+  | "screening.results.get"
+  | "conversation.list"
+  | "conversation.get"
+  | "agent.stop";
+
+export interface AgentCommandBase<TType extends AgentCommandType> {
+  id: string;
+  type: TType;
+}
+
+export interface AgentCommandWithPayload<TType extends AgentCommandType, TPayload>
+  extends AgentCommandBase<TType> {
+  payload: TPayload;
+}
+
+export type AgentCommand =
+  | AgentCommandWithPayload<"workspace.open", { workspacePath: string }>
+  | AgentCommandBase<"sources.import_seed">
+  | AgentCommandBase<"sources.list">
+  | AgentCommandWithPayload<
+      "screening.start",
+      {
+        sourceKey: string;
+        queryText: string;
+        options?: ScreeningQueryOptions;
+      }
+    >
+  | AgentCommandWithPayload<"screening.results.get", { conversationId: string }>
+  | AgentCommandBase<"conversation.list">
+  | AgentCommandWithPayload<"conversation.get", { conversationId: string }>
+  | AgentCommandBase<"agent.stop">;
+
+export type AgentEventType =
+  | "agent.ready"
+  | "workspace.opened"
+  | "sources.imported"
+  | "sources.loaded"
+  | "conversation.listed"
+  | "conversation.loaded"
+  | "screening.started"
+  | "screening.intent_analyzed"
+  | "screening.paper_scored"
+  | "screening.results.loaded"
+  | "screening.completed"
+  | "agent.error";
+
+export interface AgentEventBase<TType extends AgentEventType, TPayload = undefined> {
+  id?: string;
+  type: TType;
+  payload: TPayload;
+}
+
+export interface LocalConversationSummary {
+  id: string;
+  title: string;
+  mode: "chat" | "screening";
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocalMessageRecord {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface LocalScreeningResultRecord {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  paperId: string;
+  decision: ScreeningDecision;
+  score: number;
+  reasoning: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  paper: PaperRecord;
+}
+
+export type AgentEvent =
+  | AgentEventBase<"agent.ready", { runtime: string; version: string }>
+  | AgentEventBase<"workspace.opened", { workspacePath: string }>
+  | AgentEventBase<
+      "sources.imported",
+      { sourceKey: string; importedCount: number; skippedCount: number }
+    >
+  | AgentEventBase<"sources.loaded", { sources: SourceSummary[] }>
+  | AgentEventBase<"conversation.listed", { conversations: LocalConversationSummary[] }>
+  | AgentEventBase<
+      "conversation.loaded",
+      { conversation: LocalConversationSummary; messages: LocalMessageRecord[] }
+    >
+  | AgentEventBase<
+      "screening.started",
+      { conversationId: string; messageId: string; sourceKey: string; queryText: string }
+    >
+  | AgentEventBase<
+      "screening.intent_analyzed",
+      { conversationId: string; summary: string; focusTerms: string[] }
+    >
+  | AgentEventBase<
+      "screening.paper_scored",
+      {
+        conversationId: string;
+        paperId: string;
+        decision: ScreeningDecision;
+        score: number;
+        reasoning: string;
+      }
+    >
+  | AgentEventBase<
+      "screening.results.loaded",
+      { conversationId: string; results: LocalScreeningResultRecord[] }
+    >
+  | AgentEventBase<
+      "screening.completed",
+      { conversationId: string; totalCount: number; matchedCount: number }
+    >
+  | AgentEventBase<"agent.error", { message: string; detail?: string }>;

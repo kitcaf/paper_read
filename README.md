@@ -1,42 +1,42 @@
 # paper-read
 
-Web-first AI paper screening and reading system.
+Local-first AI paper research workspace.
 
 Current target architecture:
 
-- Frontend: React + TypeScript
-- Backend API: Hono + TypeScript
-- Backend runtime: Bun
-- Database: PostgreSQL
-- Agent capability: backend-internal TypeScript module
-- Runtime model: Web app + backend service
+- Desktop app shell: Tauri v2
+- UI: React + TypeScript + Vite
+- Agent runtime: Bun-compiled TypeScript sidecar
+- Local storage: SQLite workspace file managed by the sidecar
+- Rust role: thin host only, responsible for windowing, permissions, sidecar lifecycle, and command/event forwarding
+- Runtime model: local desktop app, no remote backend required
 
 Repository mode:
 
-- Lightweight monorepo with `pnpm-workspace.yaml`
-- Shared cross-package types in `packages/shared`
+- Lightweight pnpm monorepo
+- Shared UI/sidecar contracts in `packages/shared`
+- Agent runtime in `packages/agent-runtime`
+- Source connector boundaries in `packages/source-connectors`
+- Prompt/tool contracts in `packages/prompt-spec`
 
 Suggested top-level layout:
 
+- `apps/desktop/`
 - `packages/shared/`
-- `web/`
-- `backend/`
+- `packages/agent-runtime/`
+- `packages/source-connectors/`
+- `packages/prompt-spec/`
 
-Basic repository scripts:
+Basic scripts:
 
 - `pnpm install`
-- `pnpm run dev:web`
-- `pnpm run dev:backend`
-- `pnpm run dev:worker`
+- `pnpm run dev:ui` for UI-only Vite preview
+- `pnpm run dev:desktop` for the functional Tauri + sidecar app
 - `pnpm run build:shared`
-- `pnpm run build:backend`
-- `pnpm run build:web`
+- `pnpm run build:agent-runtime`
+- `pnpm run build:desktop`
 - `pnpm run build`
-
-Backend package scripts:
-
-- `pnpm --filter @paper-read/backend dev` -> `bun --watch src/server.ts`
-- `pnpm --filter @paper-read/backend dev:worker` -> `bun --watch src/modules/agent/worker.ts`
+- `pnpm --filter @paper-read/agent-runtime compile`
 
 Docs:
 

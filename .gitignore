@@ -1,6 +1,11 @@
 node_modules/
 dist/
 coverage/
+target/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/binaries/agent-runtime*
+!apps/desktop/src-tauri/binaries/.gitkeep
+workspace-data/
 .env
 .env.local
 .env.*.local

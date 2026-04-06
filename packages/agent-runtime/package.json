@@ -1,0 +1,26 @@
+{
+  "name": "@paper-read/agent-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "compile": "bun run scripts/compile-sidecar.ts"
+  },
+  "dependencies": {
+    "@paper-read/prompt-spec": "workspace:*",
+    "@paper-read/shared": "workspace:*",
+    "@paper-read/source-connectors": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.21"
+  },
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

@@ -4,12 +4,15 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.18.1",
   "scripts": {
-    "dev:web": "pnpm --filter @paper-read/web dev",
-    "dev:backend": "pnpm --filter @paper-read/backend dev",
+    "dev:desktop": "pnpm --filter @paper-read/desktop tauri:dev",
+    "dev:ui": "pnpm --filter @paper-read/desktop dev",
     "build:shared": "pnpm --filter @paper-read/shared build",
-    "build:web": "pnpm --filter @paper-read/web build",
-    "build:backend": "pnpm --filter @paper-read/backend build",
-    "build": "pnpm run build:shared && pnpm run build:backend && pnpm run build:web"
+    "build:agent-runtime": "pnpm --filter @paper-read/agent-runtime build",
+    "build:source-connectors": "pnpm --filter @paper-read/source-connectors build",
+    "build:prompt-spec": "pnpm --filter @paper-read/prompt-spec build",
+    "build:desktop": "pnpm --filter @paper-read/desktop build",
+    "tauri:build": "pnpm --filter @paper-read/desktop tauri:build",
+    "build": "pnpm run build:shared && pnpm run build:source-connectors && pnpm run build:prompt-spec && pnpm run build:agent-runtime && pnpm run build:desktop"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
@@ -19,9 +22,10 @@
     "overrides": {
       "@types/bun": "^1.2.21",
       "@types/node": "^25.5.0",
-      "dotenv": "^17.3.1",
-      "hono": "^4.3.3",
-      "pino": "^10.3.1",
+      "@tailwindcss/vite": "^4.1.13",
+      "@tauri-apps/api": "^2.0.0",
+      "@tauri-apps/cli": "^2.0.0",
+      "tailwindcss": "^4.1.13",
       "typescript": "^6.0.2",
       "zod": "^4.3.6"
     }

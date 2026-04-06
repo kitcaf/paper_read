@@ -1,4 +1,3 @@
 packages:
   - "packages/*"
-  - "web"
-  - "backend"
+  - "apps/*"

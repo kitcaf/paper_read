@@ -1,211 +1,216 @@
-# AI Paper Reader 全 TypeScript 技术设计文档
+# AI Paper Reader 本地桌面技术设计文档
 
 ## 1. 文档目的
 
-本文档用于明确项目当前采用的技术路线：
+本文档用于明确项目新的技术路线：
 
-- 前端使用 React + TypeScript
-- 后端使用 Hono + TypeScript
-- 后端运行时使用 Bun
-- Agent 作为后端内部模块存在
-- 数据库使用 PostgreSQL
-- Web 应用作为唯一主入口
+- 产品形态从 Web + backend 调整为 local-first 桌面 App
+- 桌面壳使用 Tauri v2
+- UI 继续使用 React + TypeScript
+- 核心 agent 使用 TypeScript，并由 Bun 编译为本地 sidecar
+- 本地持久化使用 SQLite
+- 不再依赖远程 PostgreSQL 或远程 backend
 
 ## 2. 核心技术决策
 
-### 2.1 为什么统一到全 TypeScript
+### 2.1 为什么改成本地桌面 App
 
-统一语言栈带来的收益非常直接：
+当前产品是单用户研究工作台，不需要多租户、用户系统和公网服务。用户数据、论文源缓存、筛选结果和对话历史都更适合放在本地 workspace 中。
 
-- 前端、后端使用同一门语言
-- 团队上下文切换成本更低
-- DTO 和状态类型更容易保持一致
-- Web 产品开发节奏更顺
-
-### 2.2 为什么后端选择 Hono + Bun
-
-当前后端更适合采用 Hono 配合 Bun，原因是：
-
-1. Hono 天然适合按模块拆分子路由，并用 `app.route()` 组合
-2. Bun 可以直接运行 TypeScript，开发链路更轻
-3. 整体更贴近“前端生态统一”的目标，同时保留后端模块边界
-
-### 2.3 为什么 agent 收回到 backend 内部
-
-当前项目的核心还是标准 Web 应用，不是独立 Agent 平台。
-
-所以更合理的结构是：
-
-- `web` 负责前端
-- `backend` 负责 API 和业务模块
-- `backend/src/modules/agent` 负责智能处理能力
-
-这种方式更适合当前阶段，因为：
-
-- agent 只是后端业务能力之一
-- 不需要额外维护一个顶层独立服务目录
-- 数据、任务、调度都更容易围绕后端统一组织
-
-## 3. 总体系统架构
+因此目标架构改成：
 
 ```text
-React Web
-  -> Hono Backend API (Bun runtime)
-    -> PostgreSQL
-    -> File Storage
-    -> Backend Agent Module
-      -> LLM Adapter
-      -> PDF Fetcher
-      -> PDF Parser
+React UI
+  -> Tauri thin host
+    -> Bun TypeScript agent sidecar
+      -> SQLite workspace
+      -> local files/cache
+      -> source connectors
+      -> LLM providers
 ```
 
-如果需要实时任务更新，前后端之间使用：
+### 2.2 为什么使用 Tauri v2
 
-- WebSocket
-或
-- SSE
+Tauri v2 负责桌面应用宿主能力：
 
-## 4. 服务职责划分
+- 窗口
+- 权限
+- sidecar 生命周期
+- command/event 转发
+- 本地应用路径
 
-## 4.1 `web`
+Rust 不承载业务逻辑，只做极薄 host。
 
-前端负责：
+### 2.3 为什么 agent 仍然使用 TypeScript
 
-- 页面展示
-- 项目与任务操作
-- 列表筛选与详情查看
-- 接收任务状态更新
+项目主栈仍然是 TypeScript。agent runtime 放在 `packages/agent-runtime`，由 Bun 编译为 sidecar executable。这样后续可以复用到：
 
-## 4.2 `backend`
+- Desktop App
+- CLI
+- Docker self-host
+- headless batch mode
 
-后端负责：
+### 2.4 为什么使用 SQLite
 
-- 提供 HTTP / WebSocket 接口
-- 管理项目、论文、任务、导出等业务对象
-- 维护任务记录与状态
-- 内部调用 agent 模块执行智能处理
+本地端只需要最小嵌入式数据库：
 
-## 4.3 `backend/modules/agent`
+- 对话历史
+- 消息
+- 论文元数据
+- 筛选结果
 
-agent 模块负责：
+SQLite 不需要数据库服务，也不需要用户安装 PostgreSQL，符合本地桌面应用的部署目标。
 
-- 处理 screening / reading 类型任务
-- 组织 step 执行
-- 封装 LLM、下载、解析等外部能力
-- 记录事件、错误和中间产物
+## 3. 进程与模块边界
 
-## 5. Backend 内部 agent 设计
+### 3.1 React UI
 
-## 5.1 核心抽象
-
-当前 agent 模块采用三层抽象：
-
-1. `Job`
-2. `Step`
-3. `Adapter`
-
-对应职责：
-
-- `Job`：数据库中的任务记录
-- `Step`：单个处理步骤
-- `Adapter`：对外部依赖的封装
-
-## 5.2 推荐 step 粒度
-
-建议保持以下处理粒度：
-
-- `loadProjectContext`
-- `screenAbstract`
-- `fetchPdf`
-- `parsePdf`
-- `extractInsights`
-
-## 5.3 模块位置
+位置：
 
 ```text
-backend/src/modules/agent/
-├─ agent.router.ts
-├─ agent.service.ts
-├─ worker.ts
-├─ config/
-├─ core/
-├─ workflows/
-├─ steps/
-├─ adapters/
-├─ repositories/
-├─ services/
-├─ prompts/
-├─ runtime/
-└─ types/
+apps/desktop/src/
 ```
 
-说明：
+职责：
 
-- `agent.router.ts`：暴露 agent 相关接口
-- `agent.service.ts`：提供模块级调用入口
-- `worker.ts`：后台循环入口
-- 其余目录用于组织具体实现
+- 三栏 UI
+- 聊天输入
+- 工具调用入口
+- 历史对话展示
+- 筛选论文结果展示
 
-## 6. 前端模块设计
+不负责：
+
+- 直接访问 SQLite
+- 执行 agent
+- 调用 LLM
+- 读写本地文件
+
+### 3.2 Tauri Host
+
+位置：
 
 ```text
-web/src/
-├─ main.tsx
-├─ App.tsx
-├─ router/
-├─ pages/
-├─ components/
-├─ modules/
-├─ services/
-├─ hooks/
-├─ types/
-├─ utils/
-└─ styles/
+apps/desktop/src-tauri/
 ```
 
-## 7. 后端模块设计
+职责：
+
+- 注册最小 Rust command
+- 启动/停止 Bun sidecar
+- 转发 sidecar stdout/stderr event
+- 返回 workspace 路径
+- 管理 capabilities
+
+当前最小 command：
+
+- `get_workspace_path`
+- `start_agent_runtime`
+- `send_agent_command`
+- `stop_agent_runtime`
+
+### 3.3 Agent Runtime
+
+位置：
 
 ```text
-backend/src/
-├─ server.ts
-├─ app.ts
-├─ config/
-├─ middleware/
-├─ routes/
-├─ modules/
-│  ├─ agent/
-│  ├─ projects/
-│  ├─ papers/
-│  └─ tasks/
-├─ db/
-├─ lib/
-└─ types/
+packages/agent-runtime/
 ```
 
-## 8. Monorepo 结构
+职责：
+
+- 初始化 workspace
+- 初始化 SQLite schema
+- 处理 command/event 协议
+- 管理论文源
+- 执行 title-only screening MVP
+- 写入 conversation/message/result
+
+### 3.4 Shared Contracts
+
+位置：
+
+```text
+packages/shared/
+```
+
+职责：
+
+- command 类型
+- event 类型
+- source 类型
+- screening 类型
+- UI 与 sidecar 共享的数据结构
+
+## 4. 本地数据模型
+
+SQLite 第一版只保留 4 张表：
+
+```text
+conversations
+messages
+papers
+screening_results
+```
+
+暂时不做：
+
+- users
+- projects
+- tasks
+- remote sync
+- PostgreSQL
+
+## 5. Sidecar 通信协议
+
+UI 到 Tauri：
+
+```text
+invoke("send_agent_command", { command: JSON.stringify(command) })
+```
+
+Tauri 到 sidecar：
+
+```text
+stdin JSON line
+```
+
+sidecar 到 Tauri：
+
+```text
+stdout JSON line
+```
+
+Tauri 到 UI：
+
+```text
+agent-runtime:event
+agent-runtime:error
+agent-runtime:terminated
+```
+
+## 6. Monorepo 结构
 
 ```text
 paper_read/
+├─ apps/
+│  └─ desktop/
 ├─ packages/
-│  └─ shared/
-├─ web/
-├─ backend/
-│  ├─ infra/
-│  └─ storage/
+│  ├─ shared/
+│  ├─ agent-runtime/
+│  ├─ source-connectors/
+│  └─ prompt-spec/
+├─ devDoc/
 ├─ docs/
 ├─ package.json
 ├─ pnpm-workspace.yaml
-├─ tsconfig.base.json
-└─ README.md
+└─ tsconfig.base.json
 ```
 
-## 9. 结论
+项目不再保留远程 backend 运行路径，React UI 通过 Tauri command/event 与本地 sidecar 通信。
 
-当前项目最合适的方向是：
+## 7. 结论
 
-- 前端用 React + TypeScript
-- 后端用 Hono + TypeScript，运行时使用 Bun
-- agent 作为 backend 内部模块存在
-- PostgreSQL 做业务持久化
+项目目标架构正式收敛为：
 
-这比单独拆顶层 `agent/` 更符合当前阶段，也更贴近你要的“前后端主架构 + 后端内置 agent 能力”。
+**Tauri v2 + React UI + Bun compiled TypeScript agent sidecar + SQLite local workspace。**

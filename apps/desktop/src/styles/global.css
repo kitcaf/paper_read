@@ -1,0 +1,82 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=Public+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Public Sans", "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Times New Roman", serif;
+
+  --color-paper-50: #f8f4eb;
+  --color-paper-100: #eee6d7;
+  --color-paper-200: #e2d3bb;
+  --color-ink-900: #18252f;
+  --color-ink-800: #243744;
+  --color-ink-700: #3b5362;
+  --color-ink-500: #708795;
+  --color-ink-300: #b9c9d1;
+  --color-mint-500: #2d8f7a;
+  --color-amber-500: #cc8b2f;
+  --color-coral-500: #c6614d;
+  --color-sky-500: #3b82b2;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    @apply bg-paper-50 text-ink-900 antialiased;
+  }
+
+  body {
+    @apply m-0 min-w-[320px] bg-paper-50 text-ink-900 font-sans;
+    background-image:
+      radial-gradient(circle at top left, rgba(36, 55, 68, 0.05), transparent 24%),
+      linear-gradient(180deg, rgba(250, 247, 240, 1), rgba(243, 236, 226, 1));
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+
+  ::selection {
+    background: rgba(45, 143, 122, 0.18);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: rgba(112, 135, 149, 0.32);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .surface-panel {
+    @apply rounded-[28px] border border-white/60 bg-white/75 shadow-[0_20px_60px_rgba(36,55,68,0.08)] backdrop-blur-xl;
+  }
+
+  .soft-label {
+    @apply text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-ink-500;
+  }
+
+  .status-chip {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.14em];
+  }
+}
