@@ -23,18 +23,25 @@ export interface ChatCompletionProviderOptions {
   apiKey?: string;
   modelName: string;
   request: ModelGenerateRequest;
+  extraBody?: Record<string, unknown>;
+  includeTemperature?: boolean;
 }
 
-function toChatCompletionBody(modelName: string, request: ModelGenerateRequest) {
+function toChatCompletionBody(
+  modelName: string,
+  request: ModelGenerateRequest,
+  options?: Pick<ChatCompletionProviderOptions, "extraBody" | "includeTemperature">
+) {
   return {
     model: request.modelName ?? modelName,
     messages: request.messages satisfies ModelMessage[],
-    temperature: request.temperature,
     max_tokens: request.maxTokens,
     stream: Boolean(request.stream),
+    ...(options?.includeTemperature === false ? {} : { temperature: request.temperature }),
     ...(request.responseFormat === "json_object"
       ? { response_format: { type: "json_object" } }
-      : {})
+      : {}),
+    ...(options?.extraBody ?? {})
   };
 }
 
@@ -64,7 +71,9 @@ export async function requestChatCompletion({
   baseUrl,
   apiKey,
   modelName,
-  request
+  request,
+  extraBody,
+  includeTemperature
 }: ChatCompletionProviderOptions) {
   const endpoint = `${trimTrailingSlash(baseUrl)}/chat/completions`;
   const response = await fetch(endpoint, {
@@ -73,7 +82,9 @@ export async function requestChatCompletion({
       "content-type": "application/json",
       ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {})
     },
-    body: JSON.stringify(toChatCompletionBody(modelName, request))
+    body: JSON.stringify(
+      toChatCompletionBody(modelName, request, { extraBody, includeTemperature })
+    )
   });
 
   await ensureOkResponse(response, providerName);

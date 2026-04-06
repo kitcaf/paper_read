@@ -62,6 +62,13 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
     requiresApiKey: true
   },
   {
+    provider: "kimi",
+    label: "Kimi / Moonshot",
+    defaultModelName: "kimi-k2.5",
+    defaultBaseUrl: "https://api.moonshot.cn/v1",
+    requiresApiKey: true
+  },
+  {
     provider: "ollama",
     label: "Ollama / Local",
     defaultModelName: "llama3.1",
@@ -94,7 +101,6 @@ export function ModelSettingsDialog({
   const [apiKey, setApiKey] = useState("");
   const [temperature, setTemperature] = useState("0.1");
   const [maxTokens, setMaxTokens] = useState("900");
-  const [stream, setStream] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -109,7 +115,6 @@ export function ModelSettingsDialog({
     setApiKey("");
     setTemperature(String(settings?.temperature ?? 0.1));
     setMaxTokens(String(settings?.maxTokens ?? 900));
-    setStream(Boolean(settings?.stream));
   }, [open, settings]);
 
   function handleProviderChange(nextProvider: ModelProviderKind) {
@@ -129,8 +134,7 @@ export function ModelSettingsDialog({
       ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
       temperature: Number(temperature),
       maxTokens: Number(maxTokens),
-      responseFormat: "json_object",
-      stream
+      responseFormat: "json_object"
     });
   }
 
@@ -140,7 +144,7 @@ export function ModelSettingsDialog({
     <ModalShell
       open={open}
       title="模型设置"
-      description="配置本地 agent 调用的大模型协议；API Key 只保存在本地 workspace。"
+      description="配置本地 agent 调用的大模型协议；默认优先使用流式 API，服务端不支持时会自动降级。"
       sizeClassName="max-w-2xl"
       footer={
         <div className="flex items-center justify-between gap-3">
@@ -223,7 +227,7 @@ export function ModelSettingsDialog({
           />
         </label>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-sm font-medium text-ink-700">
             Temperature
             <input
@@ -243,16 +247,10 @@ export function ModelSettingsDialog({
               onChange={(event) => setMaxTokens(event.target.value)}
             />
           </label>
+        </div>
 
-          <label className="flex items-center gap-3 rounded-2xl border border-ink-300/35 bg-white/65 px-4 py-3 text-sm font-medium text-ink-700">
-            <input
-              checked={stream}
-              className="h-4 w-4 accent-ink-900"
-              type="checkbox"
-              onChange={(event) => setStream(event.target.checked)}
-            />
-            流式 API
-          </label>
+        <div className="rounded-2xl border border-ink-300/35 bg-white/65 px-4 py-3 text-xs leading-5 text-ink-500">
+          当前模型调用默认优先走流式接口；如果该服务端或模型不支持流式，agent 会自动重试非流式请求。
         </div>
       </div>
     </ModalShell>

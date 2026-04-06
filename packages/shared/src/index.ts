@@ -60,7 +60,8 @@ export type ModelProviderKind =
   | "ollama"
   | "anthropic"
   | "gemini"
-  | "deepseek";
+  | "deepseek"
+  | "kimi";
 export type ModelResponseFormat = "text" | "json_object";
 
 export interface ModelProviderSettings {

@@ -13,12 +13,14 @@ const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
 const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEFAULT_KIMI_BASE_URL = "https://api.moonshot.cn/v1";
 const DEFAULT_MOCK_MODEL_NAME = "rule-based-title-screening";
 const DEFAULT_OPENAI_COMPATIBLE_MODEL_NAME = "gpt-4.1-mini";
 const DEFAULT_OLLAMA_MODEL_NAME = "llama3.1";
 const DEFAULT_ANTHROPIC_MODEL_NAME = "claude-sonnet-4-5";
 const DEFAULT_GEMINI_MODEL_NAME = "gemini-2.5-flash";
 const DEFAULT_DEEPSEEK_MODEL_NAME = "deepseek-chat";
+const DEFAULT_KIMI_MODEL_NAME = "kimi-k2.5";
 
 export const DEFAULT_MODEL_PROVIDER_SETTINGS: RequiredModelProviderSettings = {
   provider: "mock",
@@ -36,7 +38,8 @@ function isModelProviderKind(value: unknown): value is ModelProviderKind {
     value === "ollama" ||
     value === "anthropic" ||
     value === "gemini" ||
-    value === "deepseek"
+    value === "deepseek" ||
+    value === "kimi"
   );
 }
 
@@ -69,6 +72,10 @@ function defaultModelName(provider: ModelProviderKind) {
     return DEFAULT_DEEPSEEK_MODEL_NAME;
   }
 
+  if (provider === "kimi") {
+    return DEFAULT_KIMI_MODEL_NAME;
+  }
+
   return DEFAULT_MOCK_MODEL_NAME;
 }
 
@@ -93,7 +100,15 @@ function defaultBaseUrl(provider: ModelProviderKind) {
     return DEFAULT_DEEPSEEK_BASE_URL;
   }
 
+  if (provider === "kimi") {
+    return DEFAULT_KIMI_BASE_URL;
+  }
+
   return undefined;
+}
+
+function shouldStreamByDefault(provider: ModelProviderKind) {
+  return provider !== "mock";
 }
 
 export function normalizeModelProviderSettings(
@@ -118,7 +133,7 @@ export function normalizeModelProviderSettings(
       settings?.responseFormat === "text" || settings?.responseFormat === "json_object"
         ? settings.responseFormat
         : DEFAULT_MODEL_PROVIDER_SETTINGS.responseFormat,
-    stream: Boolean(settings?.stream)
+    stream: shouldStreamByDefault(provider)
   };
 }
 
@@ -158,6 +173,15 @@ export function withRuntimeSecrets(
   if (settings.provider === "deepseek") {
     const apiKey = readOptionalString(
       process.env.PAPER_READ_DEEPSEEK_API_KEY ?? process.env.DEEPSEEK_API_KEY
+    );
+    return apiKey ? { ...settings, apiKey } : settings;
+  }
+
+  if (settings.provider === "kimi") {
+    const apiKey = readOptionalString(
+      process.env.PAPER_READ_KIMI_API_KEY ??
+        process.env.KIMI_API_KEY ??
+        process.env.MOONSHOT_API_KEY
     );
     return apiKey ? { ...settings, apiKey } : settings;
   }

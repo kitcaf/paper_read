@@ -5,6 +5,7 @@ import type {
 } from "@paper-read/shared";
 
 import { analyzeIntent, scorePaperTitle } from "./screening";
+import { generateWithStreamingFallback } from "./models/generate";
 import type { ModelRuntime } from "./models/types";
 
 interface ScreeningIntentModelResponse {
@@ -26,6 +27,8 @@ interface ScreeningModelResultMetadata {
   usedFallback: boolean;
   fallbackReason?: string;
   matchedKeywords?: string[];
+  usedStreamingFallback?: boolean;
+  streamingFallbackReason?: string;
 }
 
 export interface ScreeningModelScore {
@@ -157,7 +160,7 @@ export async function analyzeIntentWithModel(
   }
 
   try {
-    const response = await runtime.provider.generate(runtime.settings, {
+    const response = await generateWithStreamingFallback(runtime, {
       messages: [
         {
           role: "system",
@@ -192,7 +195,7 @@ export async function scorePaperWithModel(
   }
 
   try {
-    const response = await runtime.provider.generate(runtime.settings, {
+    const response = await generateWithStreamingFallback(runtime, {
       messages: [
         {
           role: "system",
@@ -216,7 +219,17 @@ export async function scorePaperWithModel(
       stream: runtime.settings.stream
     });
 
-    return parseScoreModelResponse(runtime, response.content);
+    const parsedScore = parseScoreModelResponse(runtime, response.content);
+    return {
+      ...parsedScore,
+      metadata: {
+        ...parsedScore.metadata,
+        usedStreamingFallback: response.usedStreamingFallback,
+        ...(response.streamingFallbackReason
+          ? { streamingFallbackReason: response.streamingFallbackReason }
+          : {})
+      }
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return fallbackScore(runtime, queryText, paper, message);
