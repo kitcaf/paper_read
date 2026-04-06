@@ -23,21 +23,15 @@ export const DEFAULT_TEMPERATURE = "0.1";
 export const DEFAULT_MAX_TOKENS = "900";
 
 export const DEFAULT_PROVIDER_OPTION: ProviderOption = {
-  provider: "mock",
-  label: "Mock / Rule-based",
-  defaultModelName: "rule-based-title-screening",
-  requiresApiKey: false
+  provider: "openai-compatible",
+  label: "OpenAI Compatible",
+  defaultModelName: "gpt-4.1-mini",
+  defaultBaseUrl: "https://api.openai.com/v1",
+  requiresApiKey: true
 };
 
 export const PROVIDER_OPTIONS: ProviderOption[] = [
   DEFAULT_PROVIDER_OPTION,
-  {
-    provider: "openai-compatible",
-    label: "OpenAI Compatible",
-    defaultModelName: "gpt-4.1-mini",
-    defaultBaseUrl: "https://api.openai.com/v1",
-    requiresApiKey: true
-  },
   {
     provider: "anthropic",
     label: "Anthropic Claude",
@@ -95,7 +89,7 @@ export function readDraftNumber(value: string, fallback: string) {
 }
 
 export function createDraftFromProfile(profile: ModelProviderProfile | null): ModelProfileDraft {
-  const option = getProviderOption(profile?.settings.provider ?? "mock");
+  const option = getProviderOption(profile?.settings.provider ?? DEFAULT_PROVIDER_OPTION.provider);
 
   return {
     name: profile?.name ?? "New model",

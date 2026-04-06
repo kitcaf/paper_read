@@ -1,7 +1,6 @@
 import type { ModelProviderKind } from "@paper-read/shared";
 
 import { normalizeModelProviderSettings, withRuntimeSecrets } from "./config";
-import { mockModelProvider } from "./providers/mockProvider";
 import { anthropicProvider } from "./providers/anthropicProvider";
 import { deepSeekProvider } from "./providers/deepseekProvider";
 import { geminiProvider } from "./providers/geminiProvider";
@@ -11,7 +10,6 @@ import { openAICompatibleProvider } from "./providers/openaiCompatibleProvider";
 import type { ModelProvider, ModelRuntime, RequiredModelProviderSettings } from "./types";
 
 const MODEL_PROVIDERS: Record<ModelProviderKind, ModelProvider> = {
-  mock: mockModelProvider,
   "openai-compatible": openAICompatibleProvider,
   ollama: ollamaProvider,
   anthropic: anthropicProvider,

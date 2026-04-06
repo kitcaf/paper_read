@@ -48,14 +48,14 @@ export function AppLayout({ header, sidebar, main, contextPanel }: AppLayoutProp
     <main
       ref={containerRef}
       className={[
-        "relative grid min-h-screen min-w-[1180px] w-full bg-paper-50 text-ink-900",
+        "relative grid h-full min-h-0 w-full min-w-[1180px] overflow-hidden bg-paper-50 text-ink-900",
         isResizing ? "" : "transition-[grid-template-columns] duration-300 ease-out"
       ].join(" ")}
       style={layoutStyle}
     >
       <div
         className={[
-          "min-h-screen overflow-hidden bg-paper-50 transition-opacity duration-200",
+          "min-h-0 overflow-hidden bg-paper-50 transition-opacity duration-200",
           isLeftPanelCollapsed
             ? "pointer-events-none border-r-0 opacity-0"
             : "border-r border-ink-300/35 opacity-100"
@@ -72,7 +72,7 @@ export function AppLayout({ header, sidebar, main, contextPanel }: AppLayoutProp
         onReset={() => handleResetWidth("left")}
       />
 
-      <div className="flex min-h-screen min-w-0 flex-col bg-white/45">
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white/45">
         {header(panelControls)}
         <div className="min-h-0 flex-1">{main}</div>
       </div>
@@ -85,7 +85,7 @@ export function AppLayout({ header, sidebar, main, contextPanel }: AppLayoutProp
 
       <div
         className={[
-          "min-h-screen overflow-hidden bg-paper-50/70 transition-opacity duration-200",
+          "min-h-0 overflow-hidden bg-paper-50/70 transition-opacity duration-200",
           isRightPanelCollapsed
             ? "pointer-events-none border-l-0 opacity-0"
             : "border-l border-ink-300/35 opacity-100"

@@ -47,7 +47,7 @@ export function ResultsPanel({
   const selectedResult = buildSelectedResult(resultsPage?.items, selectedResultId);
 
   return (
-    <aside className="flex h-full min-h-screen flex-col px-3 py-3">
+    <aside className="flex h-full min-h-0 flex-col px-3 py-3">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-ink-300/35 bg-white shadow-[0_10px_28px_rgba(24,37,47,0.06)]">
         <div className="flex items-center justify-between gap-3 border-b border-ink-300/35 px-4 py-3">
           <p className="truncate text-sm font-medium text-ink-900">

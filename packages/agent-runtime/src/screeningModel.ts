@@ -4,7 +4,6 @@ import type {
   ScreeningIntent
 } from "@paper-read/shared";
 
-import { analyzeIntent, scorePaperTitle } from "./screening";
 import { generateWithStreamingFallback } from "./models/generate";
 import type { ModelRuntime } from "./models/types";
 
@@ -74,37 +73,6 @@ function parseJsonObject(content: string): unknown {
   }
 }
 
-function fallbackIntent(queryText: string, fallbackReason?: string): ScreeningIntent {
-  const intent = analyzeIntent(queryText);
-
-  return {
-    ...intent,
-    excludeTerms: [],
-    summary: fallbackReason
-      ? `${intent.summary} (Fallback: ${fallbackReason})`
-      : intent.summary
-  };
-}
-
-function fallbackScore(
-  runtime: ModelRuntime,
-  queryText: string,
-  paper: PaperRecord,
-  fallbackReason?: string
-): ScreeningModelScore {
-  const score = scorePaperTitle(queryText, paper);
-
-  return {
-    ...score,
-    metadata: {
-      provider: runtime.provider.kind,
-      modelName: runtime.settings.modelName,
-      usedFallback: true,
-      ...(fallbackReason ? { fallbackReason } : {})
-    }
-  };
-}
-
 function parseIntentModelResponse(content: string): ScreeningIntent {
   const payload = parseJsonObject(content) as ScreeningIntentModelResponse;
   const summary =
@@ -155,34 +123,25 @@ export async function analyzeIntentWithModel(
   runtime: ModelRuntime,
   queryText: string
 ): Promise<ScreeningIntent> {
-  if (runtime.provider.kind === "mock") {
-    return fallbackIntent(queryText);
-  }
+  const response = await generateWithStreamingFallback(runtime, {
+    messages: [
+      {
+        role: "system",
+        content:
+          "You analyze research screening intent. Return only JSON with summary, focusTerms, and excludeTerms."
+      },
+      {
+        role: "user",
+        content: `Research screening query:\n${queryText}`
+      }
+    ],
+    temperature: SCREENING_MODEL_TEMPERATURE,
+    maxTokens: SCREENING_MODEL_MAX_TOKENS,
+    responseFormat: "json_object",
+    stream: runtime.settings.stream
+  });
 
-  try {
-    const response = await generateWithStreamingFallback(runtime, {
-      messages: [
-        {
-          role: "system",
-          content:
-            "You analyze research screening intent. Return only JSON with summary, focusTerms, and excludeTerms."
-        },
-        {
-          role: "user",
-          content: `Research screening query:\n${queryText}`
-        }
-      ],
-      temperature: SCREENING_MODEL_TEMPERATURE,
-      maxTokens: SCREENING_MODEL_MAX_TOKENS,
-      responseFormat: "json_object",
-      stream: runtime.settings.stream
-    });
-
-    return parseIntentModelResponse(response.content);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return fallbackIntent(queryText, message);
-  }
+  return parseIntentModelResponse(response.content);
 }
 
 export async function scorePaperWithModel(
@@ -190,48 +149,39 @@ export async function scorePaperWithModel(
   queryText: string,
   paper: PaperRecord
 ): Promise<ScreeningModelScore> {
-  if (runtime.provider.kind === "mock") {
-    return fallbackScore(runtime, queryText, paper);
-  }
-
-  try {
-    const response = await generateWithStreamingFallback(runtime, {
-      messages: [
-        {
-          role: "system",
-          content:
-            "You screen academic papers for a research query. Use only the supplied title and optional abstract. Return only JSON with decision, score, reasoning, and matchedKeywords. decision must be keep, discard, or uncertain. score must be between 0 and 1."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            queryText,
-            paper: {
-              title: paper.title,
-              abstract: paper.abstract
-            }
-          })
-        }
-      ],
-      temperature: SCREENING_MODEL_TEMPERATURE,
-      maxTokens: SCREENING_MODEL_MAX_TOKENS,
-      responseFormat: "json_object",
-      stream: runtime.settings.stream
-    });
-
-    const parsedScore = parseScoreModelResponse(runtime, response.content);
-    return {
-      ...parsedScore,
-      metadata: {
-        ...parsedScore.metadata,
-        usedStreamingFallback: response.usedStreamingFallback,
-        ...(response.streamingFallbackReason
-          ? { streamingFallbackReason: response.streamingFallbackReason }
-          : {})
+  const response = await generateWithStreamingFallback(runtime, {
+    messages: [
+      {
+        role: "system",
+        content:
+          "You screen academic papers for a research query. Use only the supplied title and optional abstract. Return only JSON with decision, score, reasoning, and matchedKeywords. decision must be keep, discard, or uncertain. score must be between 0 and 1."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          queryText,
+          paper: {
+            title: paper.title,
+            abstract: paper.abstract
+          }
+        })
       }
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return fallbackScore(runtime, queryText, paper, message);
-  }
+    ],
+    temperature: SCREENING_MODEL_TEMPERATURE,
+    maxTokens: SCREENING_MODEL_MAX_TOKENS,
+    responseFormat: "json_object",
+    stream: runtime.settings.stream
+  });
+
+  const parsedScore = parseScoreModelResponse(runtime, response.content);
+  return {
+    ...parsedScore,
+    metadata: {
+      ...parsedScore.metadata,
+      usedStreamingFallback: response.usedStreamingFallback,
+      ...(response.streamingFallbackReason
+        ? { streamingFallbackReason: response.streamingFallbackReason }
+        : {})
+    }
+  };
 }

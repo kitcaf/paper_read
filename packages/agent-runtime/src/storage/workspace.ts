@@ -111,6 +111,18 @@ function migrateWorkspaceSchema(db: Database) {
       throw error;
     }
   }
+
+  db.query(`
+    UPDATE model_profiles
+    SET
+      name = CASE WHEN name = 'Default model' THEN 'OpenAI Compatible' ELSE name END,
+      provider = 'openai-compatible',
+      model_name = 'gpt-4.1-mini',
+      base_url = 'https://api.openai.com/v1',
+      stream = 1,
+      updated_at = ?
+    WHERE provider = 'mock';
+  `).run(nowIso());
 }
 
 export function openWorkspaceStorage(workspacePath: string): WorkspaceStorage {
@@ -317,7 +329,7 @@ export function ensureDefaultModelProfile(db: Database) {
     `
   ).run(
     crypto.randomUUID(),
-    "Default model",
+    "OpenAI Compatible",
     defaultSettings.provider,
     defaultSettings.modelName,
     defaultSettings.baseUrl ?? null,

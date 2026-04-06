@@ -14,7 +14,6 @@ const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
 const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_KIMI_BASE_URL = "https://api.moonshot.cn/v1";
-const DEFAULT_MOCK_MODEL_NAME = "rule-based-title-screening";
 const DEFAULT_OPENAI_COMPATIBLE_MODEL_NAME = "gpt-4.1-mini";
 const DEFAULT_OLLAMA_MODEL_NAME = "llama3.1";
 const DEFAULT_ANTHROPIC_MODEL_NAME = "claude-sonnet-4-5";
@@ -23,17 +22,17 @@ const DEFAULT_DEEPSEEK_MODEL_NAME = "deepseek-chat";
 const DEFAULT_KIMI_MODEL_NAME = "kimi-k2.5";
 
 export const DEFAULT_MODEL_PROVIDER_SETTINGS: RequiredModelProviderSettings = {
-  provider: "mock",
-  modelName: DEFAULT_MOCK_MODEL_NAME,
+  provider: "openai-compatible",
+  modelName: DEFAULT_OPENAI_COMPATIBLE_MODEL_NAME,
+  baseUrl: DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
   temperature: DEFAULT_TEMPERATURE,
   maxTokens: DEFAULT_MAX_TOKENS,
   responseFormat: "json_object",
-  stream: false
+  stream: true
 };
 
 function isModelProviderKind(value: unknown): value is ModelProviderKind {
   return (
-    value === "mock" ||
     value === "openai-compatible" ||
     value === "ollama" ||
     value === "anthropic" ||
@@ -76,7 +75,7 @@ function defaultModelName(provider: ModelProviderKind) {
     return DEFAULT_KIMI_MODEL_NAME;
   }
 
-  return DEFAULT_MOCK_MODEL_NAME;
+  return DEFAULT_OPENAI_COMPATIBLE_MODEL_NAME;
 }
 
 function defaultBaseUrl(provider: ModelProviderKind) {
@@ -107,10 +106,6 @@ function defaultBaseUrl(provider: ModelProviderKind) {
   return undefined;
 }
 
-function shouldStreamByDefault(provider: ModelProviderKind) {
-  return provider !== "mock";
-}
-
 export function normalizeModelProviderSettings(
   settings: Partial<ModelProviderSettings> | null | undefined
 ): RequiredModelProviderSettings {
@@ -133,7 +128,7 @@ export function normalizeModelProviderSettings(
       settings?.responseFormat === "text" || settings?.responseFormat === "json_object"
         ? settings.responseFormat
         : DEFAULT_MODEL_PROVIDER_SETTINGS.responseFormat,
-    stream: shouldStreamByDefault(provider)
+    stream: true
   };
 }
 

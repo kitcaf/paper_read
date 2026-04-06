@@ -323,7 +323,7 @@ async function handleScreeningStart(command: Extract<AgentCommand, { type: "scre
       provider: modelRuntime.provider.kind,
       modelName: modelRuntime.settings.modelName,
       ...(modelRuntime.settings.baseUrl ? { baseUrl: modelRuntime.settings.baseUrl } : {}),
-      isFallback: modelRuntime.provider.kind === "mock"
+      isFallback: false
     }
   });
 

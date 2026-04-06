@@ -26,13 +26,22 @@
 
   html {
     @apply bg-paper-50 text-ink-900 antialiased;
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
     @apply m-0 min-w-[320px] bg-paper-50 text-ink-900 font-sans;
+    height: 100%;
+    overflow: hidden;
     background-image:
       radial-gradient(circle at top left, rgba(36, 55, 68, 0.05), transparent 24%),
       linear-gradient(180deg, rgba(250, 247, 240, 1), rgba(243, 236, 226, 1));
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
   }
 
   button,

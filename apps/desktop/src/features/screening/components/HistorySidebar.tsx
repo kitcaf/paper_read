@@ -28,7 +28,7 @@ export function HistorySidebar({
   onOpenSettings
 }: HistorySidebarProps) {
   return (
-    <aside className="flex h-full min-h-screen flex-col">
+    <aside className="flex h-full min-h-0 flex-col">
       <div className="border-b border-ink-300/35 px-3 py-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-[1.05rem] font-semibold text-ink-900">PaperRead</h1>

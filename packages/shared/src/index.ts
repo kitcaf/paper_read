@@ -55,7 +55,6 @@ export type ScreeningQueryStatus = "queued" | "running" | "completed" | "failed"
 export type ScreeningResultStatus = "pending" | "completed" | "failed";
 export type ScreeningDecision = "keep" | "discard" | "uncertain";
 export type ModelProviderKind =
-  | "mock"
   | "openai-compatible"
   | "ollama"
   | "anthropic"
