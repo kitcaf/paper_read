@@ -19,6 +19,9 @@ export interface ModelProfileDraft {
   isDefault: boolean;
 }
 
+export const DEFAULT_TEMPERATURE = "0.1";
+export const DEFAULT_MAX_TOKENS = "900";
+
 export const DEFAULT_PROVIDER_OPTION: ProviderOption = {
   provider: "mock",
   label: "Mock / Rule-based",
@@ -82,6 +85,15 @@ export function getInputClassName() {
   return "h-11 w-full rounded-2xl border border-ink-300/45 bg-white/85 px-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-700/60";
 }
 
+export function readDraftNumber(value: string, fallback: string) {
+  if (!value.trim()) {
+    return Number(fallback);
+  }
+
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : Number(fallback);
+}
+
 export function createDraftFromProfile(profile: ModelProviderProfile | null): ModelProfileDraft {
   const option = getProviderOption(profile?.settings.provider ?? "mock");
 
@@ -91,8 +103,8 @@ export function createDraftFromProfile(profile: ModelProviderProfile | null): Mo
     modelName: profile?.settings.modelName ?? option.defaultModelName,
     baseUrl: profile?.settings.baseUrl ?? option.defaultBaseUrl ?? "",
     apiKey: "",
-    temperature: String(profile?.settings.temperature ?? 0.1),
-    maxTokens: String(profile?.settings.maxTokens ?? 900),
+    temperature: String(profile?.settings.temperature ?? DEFAULT_TEMPERATURE),
+    maxTokens: String(profile?.settings.maxTokens ?? DEFAULT_MAX_TOKENS),
     isDefault: Boolean(profile?.isDefault)
   };
 }

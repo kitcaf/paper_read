@@ -1,6 +1,8 @@
 import type { ModelProviderProfile } from "@paper-read/shared";
 import { Star } from "lucide-react";
 
+import { getProviderOption } from "./modelSettingsConfig";
+
 interface ModelProfileListProps {
   profiles: ModelProviderProfile[];
   selectedProfileId: string | null;
@@ -24,6 +26,7 @@ export function ModelProfileList({
 
       {profiles.map((profile) => {
         const isSelected = profile.id === selectedProfileId;
+        const providerOption = getProviderOption(profile.settings.provider);
 
         return (
           <button
@@ -47,8 +50,18 @@ export function ModelProfileList({
               ) : null}
             </div>
             <p className="mt-2 truncate text-xs text-ink-500">
-              {profile.settings.provider} · {profile.settings.modelName}
+              {providerOption.label} · {profile.settings.modelName}
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {profile.settings.hasApiKey ? (
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[0.68rem] font-medium text-emerald-700">
+                  Key saved
+                </span>
+              ) : null}
+              <span className="rounded-full bg-paper-50 px-2 py-0.5 text-[0.68rem] font-medium text-ink-500">
+                {profile.settings.stream ? "Stream first" : "Local"}
+              </span>
+            </div>
           </button>
         );
       })}

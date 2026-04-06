@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { useScreeningComposer } from "../hooks/useScreeningComposer";
 import { formatSourceLabel } from "../presentation";
+import { ModelProfilePicker } from "./ModelProfilePicker";
 import { ScreeningSourceDialog } from "./ScreeningSourceDialog";
 
 interface QueryComposerProps {
@@ -137,18 +138,11 @@ export function QueryComposer({
               </div>
 
               {modelProfiles.length ? (
-                <select
-                  aria-label="Select model profile"
-                  className="h-10 max-w-[220px] rounded-full border border-ink-300/45 bg-paper-50 px-3 text-xs font-medium text-ink-700 outline-none transition hover:border-ink-300/65 hover:bg-white"
-                  value={activeModelProfileId}
-                  onChange={(event) => setActiveModelProfileId(event.target.value)}
-                >
-                  {modelProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
-                </select>
+                <ModelProfilePicker
+                  profiles={modelProfiles}
+                  selectedProfileId={activeModelProfileId}
+                  onSelectProfile={setActiveModelProfileId}
+                />
               ) : null}
             </div>
 

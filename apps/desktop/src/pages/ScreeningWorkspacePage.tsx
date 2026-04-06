@@ -124,11 +124,15 @@ export function ScreeningWorkspacePage() {
         profiles={modelSettings.profiles}
         isLoading={modelSettings.isLoading}
         isSaving={modelSettings.isSaving}
+        isTesting={modelSettings.isTesting}
+        testResult={modelSettings.testResult}
         errorMessage={modelSettings.errorMessage}
         onClose={modelSettings.onClose}
         onSaveProfile={modelSettings.onSaveProfile}
         onDeleteProfile={modelSettings.onDeleteProfile}
         onSetDefaultProfile={modelSettings.onSetDefaultProfile}
+        onTestProfile={modelSettings.onTestProfile}
+        onClearTestResult={modelSettings.onClearTestResult}
       />
     </>
   );

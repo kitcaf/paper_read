@@ -96,6 +96,14 @@ export interface ModelProviderProfileInput {
   settings: ModelProviderSettings;
 }
 
+export interface ModelProfileTestResult {
+  ok: boolean;
+  provider: ModelProviderKind;
+  modelName: string;
+  latencyMs: number;
+  message: string;
+}
+
 export interface ScreeningQueryOptions {
   threshold?: number;
   topK?: number;
@@ -176,6 +184,7 @@ export type AgentCommandType =
   | "model.profiles.upsert"
   | "model.profiles.delete"
   | "model.profiles.set_default"
+  | "model.profile.test"
   | "screening.start"
   | "screening.results.get"
   | "conversation.list"
@@ -203,6 +212,10 @@ export type AgentCommand =
   | AgentCommandWithPayload<"model.profiles.delete", { profileId: string }>
   | AgentCommandWithPayload<"model.profiles.set_default", { profileId: string }>
   | AgentCommandWithPayload<
+      "model.profile.test",
+      { profileId?: string; profile?: ModelProviderProfileInput }
+    >
+  | AgentCommandWithPayload<
       "screening.start",
       {
         sourceKey: string;
@@ -227,6 +240,7 @@ export type AgentEventType =
   | "model.profile.upserted"
   | "model.profile.deleted"
   | "model.profile.default_set"
+  | "model.profile.tested"
   | "model.provider_ready"
   | "conversation.listed"
   | "conversation.loaded"
@@ -288,6 +302,7 @@ export type AgentEvent =
   | AgentEventBase<"model.profile.upserted", { profile: ModelProviderProfile }>
   | AgentEventBase<"model.profile.deleted", { profileId: string; profiles: ModelProviderProfile[] }>
   | AgentEventBase<"model.profile.default_set", { profile: ModelProviderProfile; profiles: ModelProviderProfile[] }>
+  | AgentEventBase<"model.profile.tested", ModelProfileTestResult>
   | AgentEventBase<
       "model.provider_ready",
       {

@@ -1,4 +1,5 @@
 import type {
+  ModelProfileTestResult,
   ModelProviderKind,
   ModelProviderProfile,
   ModelProviderProfileInput
@@ -11,7 +12,10 @@ import { ModelProfileForm } from "./ModelProfileForm";
 import { ModelProfileList } from "./ModelProfileList";
 import {
   createDraftFromProfile,
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_TEMPERATURE,
   getProviderOption,
+  readDraftNumber,
   type ModelProfileDraft
 } from "./modelSettingsConfig";
 
@@ -20,11 +24,15 @@ interface ModelSettingsDialogProps {
   profiles: ModelProviderProfile[];
   isLoading: boolean;
   isSaving: boolean;
+  isTesting: boolean;
+  testResult: ModelProfileTestResult | null;
   errorMessage?: string | null;
   onClose: () => void;
   onSaveProfile: (profile: ModelProviderProfileInput) => Promise<boolean>;
   onDeleteProfile: (profileId: string) => Promise<void>;
   onSetDefaultProfile: (profileId: string) => Promise<void>;
+  onTestProfile: (profile: ModelProviderProfileInput) => Promise<ModelProfileTestResult>;
+  onClearTestResult: () => void;
 }
 
 function buildProfileInput(
@@ -42,8 +50,8 @@ function buildProfileInput(
       modelName: draft.modelName.trim() || selectedOption.defaultModelName,
       ...(draft.baseUrl.trim() ? { baseUrl: draft.baseUrl.trim() } : {}),
       ...(draft.apiKey.trim() ? { apiKey: draft.apiKey.trim() } : {}),
-      temperature: Number(draft.temperature),
-      maxTokens: Number(draft.maxTokens),
+      temperature: readDraftNumber(draft.temperature, DEFAULT_TEMPERATURE),
+      maxTokens: readDraftNumber(draft.maxTokens, DEFAULT_MAX_TOKENS),
       responseFormat: "json_object"
     }
   };
@@ -54,16 +62,21 @@ export function ModelSettingsDialog({
   profiles,
   isLoading,
   isSaving,
+  isTesting,
+  testResult,
   errorMessage,
   onClose,
   onSaveProfile,
   onDeleteProfile,
-  onSetDefaultProfile
+  onSetDefaultProfile,
+  onTestProfile,
+  onClearTestResult
 }: ModelSettingsDialogProps) {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [draft, setDraft] = useState(createDraftFromProfile(null));
-  const selectedProfile =
-    profiles.find((profile) => profile.id === selectedProfileId) ?? profiles[0] ?? null;
+  const selectedProfile = selectedProfileId
+    ? profiles.find((profile) => profile.id === selectedProfileId) ?? null
+    : null;
 
   useEffect(() => {
     if (!open) {
@@ -78,11 +91,13 @@ export function ModelSettingsDialog({
   function handleSelectProfile(profile: ModelProviderProfile) {
     setSelectedProfileId(profile.id);
     setDraft(createDraftFromProfile(profile));
+    onClearTestResult();
   }
 
   function handleCreateProfile() {
     setSelectedProfileId(null);
     setDraft(createDraftFromProfile(null));
+    onClearTestResult();
   }
 
   function handleProviderChange(provider: ModelProviderKind) {
@@ -94,6 +109,12 @@ export function ModelSettingsDialog({
       baseUrl: option.defaultBaseUrl ?? "",
       apiKey: ""
     }));
+    onClearTestResult();
+  }
+
+  function handleDraftChange(nextDraft: ModelProfileDraft) {
+    setDraft(nextDraft);
+    onClearTestResult();
   }
 
   async function handleSave() {
@@ -101,6 +122,10 @@ export function ModelSettingsDialog({
     if (didSave && !selectedProfileId) {
       setDraft(createDraftFromProfile(null));
     }
+  }
+
+  async function handleTest() {
+    await onTestProfile(buildProfileInput(selectedProfileId, draft));
   }
 
   return (
@@ -116,7 +141,6 @@ export function ModelSettingsDialog({
             <h2 id="settings-title" className="text-lg font-semibold text-ink-900">
               设置
             </h2>
-            <p className="mt-1 text-xs text-ink-500">本地工作区配置</p>
           </div>
           <button
             aria-label="Close settings"
@@ -178,9 +202,12 @@ export function ModelSettingsDialog({
             selectedProfile={selectedProfile}
             profileCount={profiles.length}
             isSaving={isSaving}
-            onDraftChange={setDraft}
+            isTesting={isTesting}
+            testResult={testResult}
+            onDraftChange={handleDraftChange}
             onProviderChange={handleProviderChange}
             onSave={() => void handleSave()}
+            onTest={() => void handleTest()}
             onDelete={(profileId) => void onDeleteProfile(profileId)}
             onSetDefault={(profileId) => void onSetDefaultProfile(profileId)}
           />

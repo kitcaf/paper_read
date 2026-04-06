@@ -5,6 +5,7 @@ import { stdin } from "node:process";
 
 import { toPublicModelProviderSettings } from "./models/config";
 import { createModelRuntime } from "./models/registry";
+import { testModelConnection } from "./models/testConnection";
 import { analyzeIntentWithModel, scorePaperWithModel } from "./screeningModel";
 import { INITIAL_PAPERS, INITIAL_SOURCE_KEY } from "./source-data/initialPapers";
 import {
@@ -199,6 +200,37 @@ async function handleModelProfilesSetDefault(
       profile,
       profiles: listModelProfiles(db)
     }
+  });
+}
+
+function createRuntimeForModelProfileTest(
+  command: Extract<AgentCommand, { type: "model.profile.test" }>
+) {
+  const { db } = getWorkspaceStorage();
+  if (!command.payload.profile) {
+    return createModelRuntime(getModelProfileSettings(db, command.payload.profileId).settings);
+  }
+
+  const existingSettings = command.payload.profile.id
+    ? getModelProfileSettings(db, command.payload.profile.id).settings
+    : null;
+
+  return createModelRuntime({
+    ...command.payload.profile.settings,
+    apiKey: command.payload.profile.settings.apiKey ?? existingSettings?.apiKey
+  });
+}
+
+async function handleModelProfileTest(
+  command: Extract<AgentCommand, { type: "model.profile.test" }>
+) {
+  const modelRuntime = createRuntimeForModelProfileTest(command);
+  const result = await testModelConnection(modelRuntime);
+
+  emit({
+    id: command.id,
+    type: "model.profile.tested",
+    payload: result
   });
 }
 
@@ -433,6 +465,9 @@ async function handleCommand(command: AgentCommand) {
       break;
     case "model.profiles.set_default":
       await handleModelProfilesSetDefault(command);
+      break;
+    case "model.profile.test":
+      await handleModelProfileTest(command);
       break;
     case "conversation.list":
       await handleConversationList(command);

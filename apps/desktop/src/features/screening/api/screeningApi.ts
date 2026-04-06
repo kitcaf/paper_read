@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   ModelProviderProfile,
   ModelProviderProfileInput,
+  ModelProfileTestResult,
   ModelProviderSettings,
   PaginatedResponse,
   PublicModelProviderSettings,
@@ -125,6 +126,21 @@ export async function setDefaultModelProfile(profileId: string): Promise<ModelPr
   );
 
   return event.payload.profiles;
+}
+
+export async function testModelProfile(
+  profile: ModelProviderProfileInput
+): Promise<ModelProfileTestResult> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request(
+      { type: "model.profile.test", payload: { profile } },
+      "model.profile.tested"
+    ),
+    "model.profile.tested"
+  );
+
+  return event.payload;
 }
 
 export async function listScreeningQueries(

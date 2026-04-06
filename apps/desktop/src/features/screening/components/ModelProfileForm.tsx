@@ -1,8 +1,14 @@
-import type { ModelProviderKind, ModelProviderProfile } from "@paper-read/shared";
-import { Check, Star, Trash2 } from "lucide-react";
+import type {
+  ModelProfileTestResult,
+  ModelProviderKind,
+  ModelProviderProfile
+} from "@paper-read/shared";
+import { Check, FlaskConical, Star, Trash2 } from "lucide-react";
 
+import { Button } from "../../../components/ui/Button";
+import { Field, SelectInput, TextInput } from "../../../components/ui/Field";
+import { ModelConnectionStatus } from "./ModelConnectionStatus";
 import {
-  getInputClassName,
   getProviderOption,
   type ModelProfileDraft,
   PROVIDER_OPTIONS
@@ -13,9 +19,12 @@ interface ModelProfileFormProps {
   selectedProfile: ModelProviderProfile | null;
   profileCount: number;
   isSaving: boolean;
+  isTesting: boolean;
+  testResult: ModelProfileTestResult | null;
   onDraftChange: (draft: ModelProfileDraft) => void;
   onProviderChange: (provider: ModelProviderKind) => void;
   onSave: () => void;
+  onTest: () => void;
   onDelete: (profileId: string) => void;
   onSetDefault: (profileId: string) => void;
 }
@@ -25,94 +34,96 @@ export function ModelProfileForm({
   selectedProfile,
   profileCount,
   isSaving,
+  isTesting,
+  testResult,
   onDraftChange,
   onProviderChange,
   onSave,
+  onTest,
   onDelete,
   onSetDefault
 }: ModelProfileFormProps) {
   const selectedOption = getProviderOption(draft.provider);
+  const hasSavedApiKey = Boolean(selectedProfile?.settings.hasApiKey);
+  const isBusy = isSaving || isTesting;
 
   return (
-    <div className="rounded-[24px] border border-ink-300/35 bg-white/72 p-4">
+    <div className="rounded-[24px] border border-ink-300/35 bg-white/78 p-4 shadow-[0_14px_36px_rgba(24,37,47,0.06)]">
       <div className="grid gap-4">
-        <label className="grid gap-2 text-sm font-medium text-ink-700">
-          名称
-          <input
-            className={getInputClassName()}
-            value={draft.name}
-            onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
-          />
-        </label>
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+          <Field label="配置名称">
+            <TextInput
+              value={draft.name}
+              onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
+            />
+          </Field>
 
-        <label className="grid gap-2 text-sm font-medium text-ink-700">
-          Provider
-          <select
-            className={getInputClassName()}
-            value={draft.provider}
-            onChange={(event) => onProviderChange(event.target.value as ModelProviderKind)}
-          >
-            {PROVIDER_OPTIONS.map((option) => (
-              <option key={option.provider} value={option.provider}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Field label="Provider">
+            <SelectInput
+              value={draft.provider}
+              onChange={(event) => onProviderChange(event.target.value as ModelProviderKind)}
+            >
+              {PROVIDER_OPTIONS.map((option) => (
+                <option key={option.provider} value={option.provider}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            Model
-            <input
-              className={getInputClassName()}
+          <Field label="模型名称">
+            <TextInput
               value={draft.modelName}
               placeholder={selectedOption.defaultModelName}
               onChange={(event) => onDraftChange({ ...draft, modelName: event.target.value })}
             />
-          </label>
+          </Field>
 
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            API Key
-            <input
-              className={getInputClassName()}
+          <Field
+            label="API Key"
+            description={
+              hasSavedApiKey && !draft.apiKey
+                ? "已保存密钥；留空会继续使用原密钥。"
+                : selectedOption.requiresApiKey
+                  ? "仅保存在本地 workspace。"
+                  : "该 provider 可不填写。"
+            }
+          >
+            <TextInput
               value={draft.apiKey}
-              placeholder={selectedOption.requiresApiKey ? "留空则保留原 Key" : "可选"}
+              placeholder={selectedOption.requiresApiKey ? "输入 API key" : "可选"}
               type="password"
               onChange={(event) => onDraftChange({ ...draft, apiKey: event.target.value })}
             />
-          </label>
+          </Field>
         </div>
 
-        <label className="grid gap-2 text-sm font-medium text-ink-700">
-          Base URL
-          <input
-            className={getInputClassName()}
+        <Field label="Base URL">
+          <TextInput
             value={draft.baseUrl}
             placeholder={selectedOption.defaultBaseUrl ?? "无需配置"}
             onChange={(event) => onDraftChange({ ...draft, baseUrl: event.target.value })}
           />
-        </label>
+        </Field>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            Temperature
-            <input
-              className={getInputClassName()}
+          <Field label="Temperature">
+            <TextInput
               value={draft.temperature}
               inputMode="decimal"
               onChange={(event) => onDraftChange({ ...draft, temperature: event.target.value })}
             />
-          </label>
+          </Field>
 
-          <label className="grid gap-2 text-sm font-medium text-ink-700">
-            Max Tokens
-            <input
-              className={getInputClassName()}
+          <Field label="Max Tokens">
+            <TextInput
               value={draft.maxTokens}
               inputMode="numeric"
               onChange={(event) => onDraftChange({ ...draft, maxTokens: event.target.value })}
             />
-          </label>
+          </Field>
         </div>
 
         <label className="flex items-center gap-3 rounded-2xl border border-ink-300/35 bg-paper-50/70 px-4 py-3 text-sm font-medium text-ink-700">
@@ -125,46 +136,43 @@ export function ModelProfileForm({
           设为默认模型
         </label>
 
-        <p className="rounded-2xl border border-ink-300/35 bg-paper-50/70 px-4 py-3 text-xs leading-5 text-ink-500">
-          模型调用默认优先走流式接口；如果服务端或模型不支持，agent 会自动降级重试非流式请求。
-        </p>
+        <ModelConnectionStatus isTesting={isTesting} result={testResult} />
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-300/30 pt-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button disabled={isBusy} variant="secondary" onClick={onTest}>
+            <FlaskConical className="h-4 w-4" />
+            测试连接
+          </Button>
+
           {selectedProfile ? (
-            <button
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-ink-300/45 px-4 text-sm font-medium text-ink-600 transition hover:border-coral-500/40 hover:text-coral-500 disabled:cursor-not-allowed disabled:opacity-45"
-              type="button"
-              disabled={isSaving || profileCount <= 1}
+            <Button
+              disabled={isBusy || profileCount <= 1}
+              variant="danger"
               onClick={() => onDelete(selectedProfile.id)}
             >
               <Trash2 className="h-4 w-4" />
               删除
-            </button>
+            </Button>
           ) : null}
+
           {selectedProfile && !selectedProfile.isDefault ? (
-            <button
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-ink-300/45 px-4 text-sm font-medium text-ink-700 transition hover:border-ink-300/65 hover:bg-white"
-              type="button"
-              disabled={isSaving}
+            <Button
+              disabled={isBusy}
+              variant="secondary"
               onClick={() => onSetDefault(selectedProfile.id)}
             >
               <Star className="h-4 w-4" />
               设为默认
-            </button>
+            </Button>
           ) : null}
         </div>
 
-        <button
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-ink-900 px-5 text-sm font-semibold text-paper-50 transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:bg-ink-500"
-          type="button"
-          disabled={isSaving}
-          onClick={onSave}
-        >
+        <Button disabled={isBusy} variant="primary" onClick={onSave}>
           <Check className="h-4 w-4" />
           {isSaving ? "保存中..." : "保存配置"}
-        </button>
+        </Button>
       </div>
     </div>
   );

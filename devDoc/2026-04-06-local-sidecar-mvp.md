@@ -9,3 +9,4 @@
 - 模型适配层扩展 `anthropic`、`gemini`、`deepseek` 原生 provider，增加 provider 层流式响应聚合；前端新增模型设置弹窗。
 - 新增 `kimi` provider，并把模型调用策略改为真实 provider 默认流式、失败自动降级非流式；前端移除流式开关。
 - 模型设置从单配置改为多 `model_profiles`，支持新增、删除、默认模型和对话级模型选择；设置弹窗拆成通用 `ModalRoot` 与 LLM 设置业务界面。
+- LLM 设置中心补充模型连接测试命令，配置表单和对话输入框模型选择器改为更清晰的组件化 UI。

@@ -10,7 +10,7 @@ import type {
 const AGENT_EVENT_CHANNEL = "agent-runtime:event";
 const AGENT_ERROR_CHANNEL = "agent-runtime:error";
 const AGENT_TERMINATED_CHANNEL = "agent-runtime:terminated";
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 type PendingRequest = {
   expectedType: AgentEventType;
