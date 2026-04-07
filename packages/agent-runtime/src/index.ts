@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { stdin } from "node:process";
 
+import { generateChatReply } from "./chat";
 import { toPublicModelProviderSettings } from "./models/config";
 import { createModelRuntime } from "./models/registry";
 import { testModelConnection } from "./models/testConnection";
@@ -268,6 +269,96 @@ async function handleConversationGet(command: Extract<AgentCommand, { type: "con
   });
 }
 
+async function handleChatStart(command: Extract<AgentCommand, { type: "chat.start" }>) {
+  const { db } = getWorkspaceStorage();
+  const selectedModelProfile = getModelProfileSettings(db, command.payload.modelProfileId);
+  const modelRuntime = createModelRuntime(selectedModelProfile.settings);
+  const existingConversation = command.payload.conversationId
+    ? listConversations(db).find((item) => item.id === command.payload.conversationId) ?? null
+    : null;
+
+  if (existingConversation && existingConversation.mode !== "chat") {
+    throw new Error("当前对话不是自由聊天模式，无法继续追加普通消息。");
+  }
+
+  const conversationId =
+    existingConversation?.id ??
+    createConversation(db, {
+      title: command.payload.messageText.slice(0, 80),
+      mode: "chat",
+      metadata: {
+        lastUserMessage: command.payload.messageText,
+        status: "completed",
+        modelProfileId: selectedModelProfile.profile.id,
+        modelProfileName: selectedModelProfile.profile.name
+      }
+    });
+
+  const userMessageId = createMessage(db, {
+    conversationId,
+    role: "user",
+    content: command.payload.messageText,
+    metadata: {
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name
+    }
+  });
+
+  emit({
+    id: command.id,
+    type: "model.provider_ready",
+    payload: {
+      profileId: selectedModelProfile.profile.id,
+      profileName: selectedModelProfile.profile.name,
+      provider: modelRuntime.provider.kind,
+      modelName: modelRuntime.settings.modelName,
+      ...(modelRuntime.settings.baseUrl ? { baseUrl: modelRuntime.settings.baseUrl } : {}),
+      isFallback: false
+    }
+  });
+
+  const reply = await generateChatReply(modelRuntime, listMessages(db, conversationId));
+  createMessage(db, {
+    conversationId,
+    role: "assistant",
+    content: reply.content,
+    metadata: {
+      provider: reply.metadata.provider,
+      modelName: reply.metadata.modelName,
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name,
+      usedStreamingFallback: reply.metadata.usedStreamingFallback,
+      ...(reply.metadata.streamingFallbackReason
+        ? { streamingFallbackReason: reply.metadata.streamingFallbackReason }
+        : {})
+    }
+  });
+
+  updateConversationMetadata(db, conversationId, {
+    lastUserMessage: command.payload.messageText,
+    lastAssistantMessage: reply.content,
+    status: "completed",
+    modelProvider: modelRuntime.provider.kind,
+    modelProfileId: selectedModelProfile.profile.id,
+    modelProfileName: selectedModelProfile.profile.name,
+    modelName: modelRuntime.settings.modelName
+  });
+
+  const conversation = listConversations(db).find((item) => item.id === conversationId);
+  if (!conversation) {
+    throw new Error("Chat conversation not found after generation.");
+  }
+
+  emit({
+    id: command.id,
+    type: "conversation.loaded",
+    payload: {
+      conversation,
+      messages: listMessages(db, conversationId)
+    }
+  });
+}
+
 async function handleScreeningResultsGet(
   command: Extract<AgentCommand, { type: "screening.results.get" }>
 ) {
@@ -468,6 +559,9 @@ async function handleCommand(command: AgentCommand) {
       break;
     case "model.profile.test":
       await handleModelProfileTest(command);
+      break;
+    case "chat.start":
+      await handleChatStart(command);
       break;
     case "conversation.list":
       await handleConversationList(command);

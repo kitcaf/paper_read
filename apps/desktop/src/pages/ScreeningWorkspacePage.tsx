@@ -12,9 +12,9 @@ import { AppLayout } from "../layout/AppLayout";
 export function ScreeningWorkspacePage() {
   const {
     sources,
-    queryHistory,
-    selectedQueryId,
-    selectedQuery,
+    conversationHistory,
+    selectedConversationId,
+    selectedConversation,
     resultsPage,
     errorMessage,
     isBootstrapping,
@@ -22,17 +22,18 @@ export function ScreeningWorkspacePage() {
     isRefreshing,
     isPending,
     composerResetKey,
-    onSubmitQuery,
-    onSelectQuery,
+    onSubmitConversation,
+    onSelectConversation,
     onStartNewChat,
-    onRefreshCurrentQuery
+    onRefreshCurrentConversation
   } = useScreeningWorkspace();
   const modelSettings = useModelSettings();
-  const currentSourceLabel = selectedQuery
-    ? formatSourceLabel(selectedQuery.sourceKey, sources)
+  const currentSourceLabel =
+    selectedConversation?.mode === "screening" && selectedConversation.sourceKey
+    ? formatSourceLabel(selectedConversation.sourceKey, sources)
     : null;
   const currentModelLabel =
-    selectedQuery?.modelProfileName ??
+    selectedConversation?.modelProfileName ??
     modelSettings.defaultProfile?.name ??
     "Model";
 
@@ -46,7 +47,7 @@ export function ScreeningWorkspacePage() {
           onToggleRightPanel
         }) => (
           <WorkspaceHeader
-            title={selectedQuery?.queryTitle ?? "新对话"}
+            title={selectedConversation?.title ?? "新对话"}
             sourceLabel={currentSourceLabel}
             modelLabel={currentModelLabel}
             isLeftPanelCollapsed={isLeftPanelCollapsed}
@@ -57,10 +58,10 @@ export function ScreeningWorkspacePage() {
         )}
         sidebar={({ onToggleSidebar }) => (
           <HistorySidebar
-            queries={queryHistory}
+            conversations={conversationHistory}
             sources={sources}
-            selectedQueryId={selectedQueryId}
-            onSelectQuery={onSelectQuery}
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={onSelectConversation}
             onCreateChat={onStartNewChat}
             onToggleSidebar={onToggleSidebar}
             onOpenSettings={modelSettings.onOpen}
@@ -81,11 +82,11 @@ export function ScreeningWorkspacePage() {
                 </div>
               ) : (
                 <QueryStatusPanel
-                  query={selectedQuery}
+                  conversation={selectedConversation}
                   resultsPage={resultsPage}
                   sources={sources}
                   isRefreshing={isRefreshing || isPending}
-                  onRefresh={onRefreshCurrentQuery}
+                  onRefresh={onRefreshCurrentConversation}
                 />
               )}
             </div>
@@ -96,13 +97,17 @@ export function ScreeningWorkspacePage() {
                 <QueryComposer
                   sources={sources}
                   modelProfiles={modelSettings.profiles}
-                  defaultSourceKey={selectedQuery?.sourceKey}
+                  defaultSourceKey={
+                    selectedConversation?.mode === "screening"
+                      ? selectedConversation.sourceKey
+                      : undefined
+                  }
                   defaultModelProfileId={
-                    selectedQuery?.modelProfileId ?? modelSettings.defaultProfile?.id
+                    selectedConversation?.modelProfileId ?? modelSettings.defaultProfile?.id
                   }
                   resetKey={composerResetKey}
                   isSubmitting={isSubmitting}
-                  onSubmit={onSubmitQuery}
+                  onSubmit={onSubmitConversation}
                 />
               </div>
             </div>
@@ -110,7 +115,7 @@ export function ScreeningWorkspacePage() {
         }
         contextPanel={({ onToggleSidebar }) => (
           <ResultsPanel
-            query={selectedQuery}
+            conversation={selectedConversation}
             resultsPage={resultsPage}
             sources={sources}
             isLoading={isRefreshing || isPending}

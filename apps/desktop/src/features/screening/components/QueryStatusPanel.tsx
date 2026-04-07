@@ -1,14 +1,14 @@
 import type {
-  ScreeningQueryDetail,
   ScreeningResultsPage,
   SourceSummary
 } from "@paper-read/shared";
 
 import { buildConversationMessages } from "../conversation";
+import type { WorkspaceConversationDetail } from "../workspaceTypes";
 import { ConversationBubble } from "./ConversationBubble";
 
 interface QueryStatusPanelProps {
-  query: ScreeningQueryDetail | null;
+  conversation: WorkspaceConversationDetail | null;
   resultsPage: ScreeningResultsPage | null;
   sources: SourceSummary[];
   isRefreshing: boolean;
@@ -16,13 +16,13 @@ interface QueryStatusPanelProps {
 }
 
 export function QueryStatusPanel({
-  query,
+  conversation,
   resultsPage,
   sources,
   isRefreshing,
   onRefresh
 }: QueryStatusPanelProps) {
-  if (!query) {
+  if (!conversation) {
     return (
       <section className="mx-auto flex h-full w-full max-w-[980px] flex-col justify-end px-4 py-8 md:px-6">
         <div className="flex items-end gap-3">
@@ -30,14 +30,14 @@ export function QueryStatusPanel({
             AI
           </div>
           <div className="max-w-[760px] rounded-[22px] border border-ink-300/40 bg-white px-5 py-4 text-sm leading-7 text-ink-700 shadow-[0_10px_24px_rgba(24,37,47,0.05)]">
-            点击下方的“筛选论文”工具，选择一个论文源，然后直接输入你想调研的主题。
+            现在可以直接自由聊天；如果你想启动论文研究流程，再点击下方的“筛选论文”工具。
           </div>
         </div>
       </section>
     );
   }
 
-  const messages = buildConversationMessages(query, resultsPage, sources);
+  const messages = buildConversationMessages(conversation, resultsPage, sources);
 
   return (
     <section className="mx-auto w-full max-w-[980px] px-4 py-6 md:px-6">
@@ -56,9 +56,9 @@ export function QueryStatusPanel({
           <ConversationBubble key={message.id} message={message} />
         ))}
 
-        {query.lastError ? (
+        {conversation.lastError ? (
           <div className="ml-[52px] max-w-[780px] rounded-[20px] border border-coral-500/20 bg-coral-500/8 px-5 py-4 text-sm leading-7 text-coral-500">
-            {query.lastError}
+            {conversation.lastError}
           </div>
         ) : null}
       </div>

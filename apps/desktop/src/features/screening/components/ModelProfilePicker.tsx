@@ -1,4 +1,5 @@
 import type { ModelProviderProfile } from "@paper-read/shared";
+import { Bot } from "lucide-react";
 
 import {
   Select,
@@ -7,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "../../../components/ui/select";
-import { getProviderOption } from "./modelSettingsConfig";
 
 interface ModelProfilePickerProps {
   profiles: ModelProviderProfile[];
@@ -32,36 +32,24 @@ export function ModelProfilePicker({
 
   return (
     <Select value={selectedProfile.id} onValueChange={onSelectProfile}>
-      <SelectTrigger className="h-12 min-w-[260px] max-w-[340px] rounded-[22px] border-ink-300/35 bg-white/92 px-2.5 shadow-[0_10px_24px_rgba(24,37,47,0.06)]">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-paper-50 px-3 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-ink-500">
+      <SelectTrigger className="h-10 min-w-[160px] max-w-[220px] rounded-full border-ink-300/35 bg-white/92 px-2.5 shadow-[0_8px_18px_rgba(24,37,47,0.05)]">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-paper-50 px-2.5 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-ink-500">
+            <Bot className="h-3.5 w-3.5" />
             LLM
           </span>
-          <div className="min-w-0 flex-1 text-left leading-none">
-            <p className="truncate text-sm font-semibold text-ink-900">{selectedProfile.name}</p>
-            <p className="mt-1 truncate text-[0.72rem] text-ink-500">
-              {getProviderOption(selectedProfile.settings.provider).label} ·{" "}
-              {selectedProfile.settings.modelName}
-            </p>
-          </div>
+          <p className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-ink-900">
+            {selectedProfile.name}
+          </p>
         </div>
         <span className="sr-only">选择模型配置</span>
       </SelectTrigger>
-      <SelectContent className="min-w-[320px]">
-        {profiles.map((profile) => {
-          const providerOption = getProviderOption(profile.settings.provider);
-
-          return (
-            <SelectItem key={profile.id} value={profile.id}>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium text-ink-900">{profile.name}</span>
-                <span className="truncate text-xs text-ink-500">
-                  {providerOption.label} · {profile.settings.modelName}
-                </span>
-              </div>
-            </SelectItem>
-          );
-        })}
+      <SelectContent className="min-w-[220px]">
+        {profiles.map((profile) => (
+          <SelectItem key={profile.id} value={profile.id}>
+            <span className="truncate font-medium text-ink-900">{profile.name}</span>
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

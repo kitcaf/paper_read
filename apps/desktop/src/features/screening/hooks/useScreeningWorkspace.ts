@@ -1,10 +1,4 @@
-import type {
-  ScreeningQueryDetail,
-  ScreeningQueryOptions,
-  ScreeningQuerySummary,
-  ScreeningResultsPage,
-  SourceSummary
-} from "@paper-read/shared";
+import type { ScreeningQueryOptions, ScreeningResultsPage, SourceSummary } from "@paper-read/shared";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 
 import {
@@ -12,24 +6,39 @@ import {
   getScreeningQuery,
   getScreeningResults,
   listScreeningQueries,
-  listSources
+  listSources,
+  sendChatMessage
 } from "../api/screeningApi";
+import type {
+  WorkspaceConversationDetail,
+  WorkspaceConversationSummary
+} from "../workspaceTypes";
 
-interface SubmitScreeningQueryInput {
+interface SubmitChatInput {
+  mode: "chat";
+  queryText: string;
+  modelProfileId?: string;
+}
+
+interface SubmitScreeningInput {
+  mode: "screening";
   sourceKey: string;
   queryText: string;
   modelProfileId?: string;
   options: ScreeningQueryOptions;
 }
 
+type SubmitConversationInput = SubmitChatInput | SubmitScreeningInput;
+
 const ACTIVE_QUERY_STATUSES = new Set(["queued", "running"]);
 const POLLING_INTERVAL_MS = 2500;
 
 export function useScreeningWorkspace() {
   const [sources, setSources] = useState<SourceSummary[]>([]);
-  const [queryHistory, setQueryHistory] = useState<ScreeningQuerySummary[]>([]);
-  const [selectedQueryId, setSelectedQueryId] = useState<string | null>(null);
-  const [selectedQuery, setSelectedQuery] = useState<ScreeningQueryDetail | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<WorkspaceConversationSummary[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<WorkspaceConversationDetail | null>(null);
   const [resultsPage, setResultsPage] = useState<ScreeningResultsPage | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -38,34 +47,35 @@ export function useScreeningWorkspace() {
   const [composerResetKey, setComposerResetKey] = useState(0);
   const [isPending, startTransition] = useTransition();
 
-  const loadQueryHistoryEvent = useEffectEvent(async () => {
+  const loadConversationHistoryEvent = useEffectEvent(async () => {
     const response = await listScreeningQueries();
     startTransition(() => {
-      setQueryHistory(response.items);
+      setConversationHistory(response.items);
     });
 
     return response.items;
   });
 
-  const loadSelectedQueryEvent = useEffectEvent(
-    async (queryId: string, options?: { silent?: boolean }) => {
+  const loadSelectedConversationEvent = useEffectEvent(
+    async (conversationId: string, options?: { silent?: boolean }) => {
       if (!options?.silent) {
         setIsRefreshing(true);
       }
 
       try {
-        const [queryDetail, queryResults] = await Promise.all([
-          getScreeningQuery(queryId),
-          getScreeningResults(queryId)
-        ]);
+        const conversationDetail = await getScreeningQuery(conversationId);
+        const conversationResults =
+          conversationDetail.mode === "screening"
+            ? await getScreeningResults(conversationId)
+            : null;
 
         startTransition(() => {
-          setSelectedQuery(queryDetail);
-          setResultsPage(queryResults);
+          setSelectedConversation(conversationDetail);
+          setResultsPage(conversationResults);
         });
       } catch (error) {
         const nextErrorMessage =
-          error instanceof Error ? error.message : "Failed to load screening query.";
+          error instanceof Error ? error.message : "Failed to load conversation.";
         setErrorMessage(nextErrorMessage);
       } finally {
         if (!options?.silent) {
@@ -85,7 +95,7 @@ export function useScreeningWorkspace() {
       try {
         const [availableSources, historyItems] = await Promise.all([
           listSources(),
-          loadQueryHistoryEvent()
+          loadConversationHistoryEvent()
         ]);
 
         if (!isMounted) {
@@ -93,8 +103,8 @@ export function useScreeningWorkspace() {
         }
 
         setSources(availableSources);
-        if (!selectedQueryId && historyItems[0]) {
-          setSelectedQueryId(historyItems[0].id);
+        if (!selectedConversationId && historyItems[0]) {
+          setSelectedConversationId(historyItems[0].id);
         }
       } catch (error) {
         if (!isMounted) {
@@ -102,7 +112,7 @@ export function useScreeningWorkspace() {
         }
 
         const nextErrorMessage =
-          error instanceof Error ? error.message : "Failed to bootstrap screening workspace.";
+          error instanceof Error ? error.message : "Failed to bootstrap workspace.";
         setErrorMessage(nextErrorMessage);
       } finally {
         if (isMounted) {
@@ -119,42 +129,64 @@ export function useScreeningWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (!selectedQueryId) {
+    if (!selectedConversationId) {
       return;
     }
 
-    void loadSelectedQueryEvent(selectedQueryId);
-  }, [selectedQueryId]);
+    void loadSelectedConversationEvent(selectedConversationId);
+  }, [selectedConversationId]);
 
   useEffect(() => {
-    if (!selectedQueryId || !selectedQuery || !ACTIVE_QUERY_STATUSES.has(selectedQuery.status)) {
+    if (
+      !selectedConversationId ||
+      !selectedConversation ||
+      selectedConversation.mode !== "screening" ||
+      !ACTIVE_QUERY_STATUSES.has(selectedConversation.status)
+    ) {
       return;
     }
 
     const intervalId = window.setInterval(() => {
-      void loadSelectedQueryEvent(selectedQueryId, { silent: true });
-      void loadQueryHistoryEvent();
+      void loadSelectedConversationEvent(selectedConversationId, { silent: true });
+      void loadConversationHistoryEvent();
     }, POLLING_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [selectedQuery, selectedQueryId]);
+  }, [selectedConversation, selectedConversationId]);
 
-  async function handleSubmitQuery(input: SubmitScreeningQueryInput) {
+  async function handleSubmitConversation(input: SubmitConversationInput) {
     setIsSubmitting(true);
     setErrorMessage(null);
 
     try {
-      const createdQuery = await createScreeningQuery(input);
-      await loadQueryHistoryEvent();
-      setSelectedQuery(null);
+      if (input.mode === "chat") {
+        const nextConversation = await sendChatMessage({
+          messageText: input.queryText,
+          conversationId:
+            selectedConversation?.mode === "chat" ? selectedConversation.id : undefined,
+          modelProfileId: input.modelProfileId
+        });
+
+        await loadConversationHistoryEvent();
+        startTransition(() => {
+          setSelectedConversation(nextConversation);
+          setSelectedConversationId(nextConversation.id);
+          setResultsPage(null);
+        });
+        return true;
+      }
+
+      const createdConversation = await createScreeningQuery(input);
+      await loadConversationHistoryEvent();
+      setSelectedConversation(null);
       setResultsPage(null);
-      setSelectedQueryId(createdQuery.id);
+      setSelectedConversationId(createdConversation.id);
       return true;
     } catch (error) {
       const nextErrorMessage =
-        error instanceof Error ? error.message : "Failed to create screening query.";
+        error instanceof Error ? error.message : "Failed to submit conversation.";
       setErrorMessage(nextErrorMessage);
       return false;
     } finally {
@@ -162,35 +194,35 @@ export function useScreeningWorkspace() {
     }
   }
 
-  function handleSelectQuery(queryId: string) {
-    setSelectedQuery(null);
+  function handleSelectConversation(conversationId: string) {
+    setSelectedConversation(null);
     setResultsPage(null);
-    setSelectedQueryId(queryId);
+    setSelectedConversationId(conversationId);
     setErrorMessage(null);
   }
 
   function handleStartNewChat() {
-    setSelectedQueryId(null);
-    setSelectedQuery(null);
+    setSelectedConversationId(null);
+    setSelectedConversation(null);
     setResultsPage(null);
     setErrorMessage(null);
     setComposerResetKey((currentValue) => currentValue + 1);
   }
 
-  async function handleRefreshCurrentQuery() {
-    if (!selectedQueryId) {
+  async function handleRefreshCurrentConversation() {
+    if (!selectedConversationId) {
       return;
     }
 
-    await loadSelectedQueryEvent(selectedQueryId);
-    await loadQueryHistoryEvent();
+    await loadSelectedConversationEvent(selectedConversationId);
+    await loadConversationHistoryEvent();
   }
 
   return {
     sources,
-    queryHistory,
-    selectedQueryId,
-    selectedQuery,
+    conversationHistory,
+    selectedConversationId,
+    selectedConversation,
     resultsPage,
     errorMessage,
     isBootstrapping,
@@ -198,9 +230,9 @@ export function useScreeningWorkspace() {
     isRefreshing,
     isPending,
     composerResetKey,
-    onSubmitQuery: handleSubmitQuery,
-    onSelectQuery: handleSelectQuery,
+    onSubmitConversation: handleSubmitConversation,
+    onSelectConversation: handleSelectConversation,
     onStartNewChat: handleStartNewChat,
-    onRefreshCurrentQuery: handleRefreshCurrentQuery
+    onRefreshCurrentConversation: handleRefreshCurrentConversation
   };
 }

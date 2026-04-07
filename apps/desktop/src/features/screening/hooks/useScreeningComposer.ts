@@ -1,12 +1,21 @@
 import type { ModelProviderProfile, ScreeningQueryOptions, SourceSummary } from "@paper-read/shared";
 import { useEffect, useState } from "react";
 
+interface SubmitChatMessageInput {
+  mode: "chat";
+  queryText: string;
+  modelProfileId?: string;
+}
+
 interface SubmitScreeningMessageInput {
+  mode: "screening";
   sourceKey: string;
   queryText: string;
   modelProfileId?: string;
   options: ScreeningQueryOptions;
 }
+
+type SubmitConversationMessageInput = SubmitChatMessageInput | SubmitScreeningMessageInput;
 
 interface UseScreeningComposerOptions {
   sources: SourceSummary[];
@@ -14,7 +23,7 @@ interface UseScreeningComposerOptions {
   defaultSourceKey?: string;
   defaultModelProfileId?: string;
   resetKey: number;
-  onSubmit: (input: SubmitScreeningMessageInput) => Promise<boolean> | boolean;
+  onSubmit: (input: SubmitConversationMessageInput) => Promise<boolean> | boolean;
 }
 
 const DEFAULT_SCREENING_OPTIONS: ScreeningQueryOptions = {
@@ -86,17 +95,19 @@ export function useScreeningComposer({
       return false;
     }
 
-    if (!activeSourceKey) {
-      setIsSourceDialogOpen(true);
-      return false;
-    }
-
-    const didSubmit = await onSubmit({
-      sourceKey: activeSourceKey,
-      queryText: normalizedQueryText,
-      modelProfileId: activeModelProfileId || undefined,
-      options: DEFAULT_SCREENING_OPTIONS
-    });
+    const didSubmit = activeSourceKey
+      ? await onSubmit({
+          mode: "screening",
+          sourceKey: activeSourceKey,
+          queryText: normalizedQueryText,
+          modelProfileId: activeModelProfileId || undefined,
+          options: DEFAULT_SCREENING_OPTIONS
+        })
+      : await onSubmit({
+          mode: "chat",
+          queryText: normalizedQueryText,
+          modelProfileId: activeModelProfileId || undefined
+        });
 
     if (didSubmit) {
       setQueryText("");
@@ -110,7 +121,7 @@ export function useScreeningComposer({
     activeSourceKey,
     activeModelProfileId,
     isSourceDialogOpen,
-    canSubmit: Boolean(queryText.trim() && activeSourceKey),
+    canSubmit: Boolean(queryText.trim()),
     setQueryText,
     setActiveModelProfileId,
     setIsSourceDialogOpen,

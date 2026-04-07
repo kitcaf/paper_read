@@ -5,12 +5,15 @@ import type {
   PaginatedResponse,
   ScreeningDecision,
   ScreeningIntent,
-  ScreeningQueryDetail,
   ScreeningQueryOptions,
   ScreeningQueryStatus,
   ScreeningResultItem,
   ScreeningResultsPage
 } from "@paper-read/shared";
+import type {
+  WorkspaceConversationDetail,
+  WorkspaceConversationSummary
+} from "../workspaceTypes";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 50;
@@ -54,55 +57,63 @@ function buildIntentFromMessages(messages: LocalMessageRecord[]): ScreeningInten
   };
 }
 
-export function mapConversationToScreeningSummary(
+export function mapConversationToWorkspaceSummary(
   conversation: LocalConversationSummary
-): ScreeningQueryDetail {
+): WorkspaceConversationSummary {
   const metadata = conversation.metadata ?? {};
+  const mode = conversation.mode;
+  const isScreeningConversation = mode === "screening";
   const status = normalizeStatus(metadata.status);
-  const totalPapers = readNumber(metadata.totalCount);
-  const matchedPapers = readNumber(metadata.matchedCount);
-  const failedPapers = readNumber(metadata.failedCount);
 
   return {
     id: conversation.id,
-    sourceKey: readString(metadata.sourceKey, "local"),
+    title: conversation.title,
+    preview: readString(
+      metadata.lastUserMessage,
+      readString(metadata.queryText, conversation.title)
+    ),
+    mode,
+    sourceKey: isScreeningConversation ? readString(metadata.sourceKey, "local") : undefined,
+    sourceLabel: isScreeningConversation
+      ? readString(metadata.sourceKey, "local").toUpperCase().replaceAll("_", " ")
+      : "自由聊天",
+    status,
     modelProfileId: readString(metadata.modelProfileId) || undefined,
     modelProfileName: readString(metadata.modelProfileName) || undefined,
-    queryTitle: conversation.title,
-    queryText: readString(metadata.queryText, conversation.title),
-    inputMode: "title",
-    status,
-    totalPapers,
-    processedPapers: status === "completed" ? totalPapers : readNumber(metadata.processedCount),
-    matchedPapers,
-    failedPapers,
-    intentSummary: readString(metadata.intentSummary) || null,
-    intentJson: metadata.focusTerms
-      ? {
-          focusTerms: readStringArray(metadata.focusTerms),
-          excludeTerms: [],
-          summary: readString(metadata.intentSummary)
-        }
-      : null,
-    options: readOptions(metadata.options),
-    lastError: readString(metadata.lastError) || null,
     createdAt: conversation.createdAt,
-    updatedAt: conversation.updatedAt,
-    completedAt: status === "completed" ? conversation.updatedAt : null
+    updatedAt: conversation.updatedAt
   };
 }
 
 export function mapConversationDetail(
   conversation: LocalConversationSummary,
   messages: LocalMessageRecord[]
-): ScreeningQueryDetail {
-  const summary = mapConversationToScreeningSummary(conversation);
-  const intent = buildIntentFromMessages(messages);
+): WorkspaceConversationDetail {
+  const summary = mapConversationToWorkspaceSummary(conversation);
+  const metadata = conversation.metadata ?? {};
+  const intent = conversation.mode === "screening" ? buildIntentFromMessages(messages) : null;
+  const totalPapers = readNumber(metadata.totalCount);
+  const matchedPapers = readNumber(metadata.matchedCount);
+  const failedPapers = readNumber(metadata.failedCount);
 
   return {
     ...summary,
-    intentSummary: intent?.summary || summary.intentSummary,
-    intentJson: intent ?? summary.intentJson
+    queryText: readString(
+      metadata.queryText,
+      messages.filter((message) => message.role === "user").at(-1)?.content ?? summary.preview
+    ),
+    modelProfileId: readString(metadata.modelProfileId) || undefined,
+    modelProfileName: readString(metadata.modelProfileName) || undefined,
+    messages,
+    options: readOptions(metadata.options),
+    intentSummary: intent?.summary ?? (readString(metadata.intentSummary) || null),
+    intentJson: intent,
+    lastError: readString(metadata.lastError) || null,
+    totalPapers,
+    processedPapers: summary.status === "completed" ? totalPapers : readNumber(metadata.processedCount),
+    matchedPapers,
+    failedPapers,
+    completedAt: summary.status === "completed" ? conversation.updatedAt : null
   };
 }
 
@@ -148,8 +159,8 @@ export function mapLocalResultsPage(results: LocalScreeningResultRecord[]): Scre
 
 export function mapConversationsPage(
   conversations: LocalConversationSummary[]
-): PaginatedResponse<ScreeningQueryDetail> {
-  const items = conversations.map(mapConversationToScreeningSummary);
+): PaginatedResponse<WorkspaceConversationSummary> {
+  const items = conversations.map(mapConversationToWorkspaceSummary);
 
   return {
     items,

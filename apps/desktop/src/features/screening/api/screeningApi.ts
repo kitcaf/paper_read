@@ -6,11 +6,13 @@ import type {
   ModelProviderSettings,
   PaginatedResponse,
   PublicModelProviderSettings,
-  ScreeningQueryDetail,
   ScreeningQueryOptions,
-  ScreeningQuerySummary,
   SourceSummary
 } from "@paper-read/shared";
+import type {
+  WorkspaceConversationDetail,
+  WorkspaceConversationSummary
+} from "../workspaceTypes";
 
 import { agentClient } from "./agentClient";
 import {
@@ -29,6 +31,12 @@ interface CreateScreeningQueryInput {
   queryText: string;
   modelProfileId?: string;
   options: ScreeningQueryOptions;
+}
+
+interface SendChatMessageInput {
+  messageText: string;
+  conversationId?: string;
+  modelProfileId?: string;
 }
 
 function assertEventType<TType extends AgentEvent["type"]>(
@@ -145,7 +153,7 @@ export async function testModelProfile(
 
 export async function listScreeningQueries(
   filter?: QueryFilterInput
-): Promise<PaginatedResponse<ScreeningQuerySummary>> {
+): Promise<PaginatedResponse<WorkspaceConversationSummary>> {
   await agentClient.ensureReady();
   const event = assertEventType(
     await agentClient.request({ type: "conversation.list" }, "conversation.listed"),
@@ -170,6 +178,26 @@ export async function getScreeningQuery(queryId: string) {
   const event = assertEventType(
     await agentClient.request(
       { type: "conversation.get", payload: { conversationId: queryId } },
+      "conversation.loaded"
+    ),
+    "conversation.loaded"
+  );
+
+  return mapConversationDetail(event.payload.conversation, event.payload.messages);
+}
+
+export async function sendChatMessage(input: SendChatMessageInput): Promise<WorkspaceConversationDetail> {
+  await agentClient.ensureReady();
+  const event = assertEventType(
+    await agentClient.request(
+      {
+        type: "chat.start",
+        payload: {
+          conversationId: input.conversationId,
+          messageText: input.messageText,
+          modelProfileId: input.modelProfileId
+        }
+      },
       "conversation.loaded"
     ),
     "conversation.loaded"

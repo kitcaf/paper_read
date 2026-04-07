@@ -1,5 +1,4 @@
 import type {
-  ScreeningQueryDetail,
   ScreeningResultItem,
   ScreeningResultsPage,
   SourceSummary
@@ -12,9 +11,10 @@ import {
   getDecisionVariant,
   truncateText
 } from "../presentation";
+import type { WorkspaceConversationDetail } from "../workspaceTypes";
 
 interface ResultsPanelProps {
-  query: ScreeningQueryDetail | null;
+  conversation: WorkspaceConversationDetail | null;
   resultsPage: ScreeningResultsPage | null;
   sources: SourceSummary[];
   isLoading: boolean;
@@ -37,7 +37,7 @@ function buildSelectedResult(
 }
 
 export function ResultsPanel({
-  query,
+  conversation,
   resultsPage,
   sources,
   isLoading,
@@ -51,10 +51,10 @@ export function ResultsPanel({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border border-ink-300/35 bg-white shadow-[0_10px_28px_rgba(24,37,47,0.06)]">
         <div className="flex items-center justify-between gap-3 border-b border-ink-300/35 px-4 py-3">
           <p className="truncate text-sm font-medium text-ink-900">
-            {selectedResult ? truncateText(selectedResult.paper.title, 42) : "Screened papers"}
+            {selectedResult ? truncateText(selectedResult.paper.title, 42) : "论文上下文"}
           </p>
           <div className="flex items-center gap-3">
-            {query ? (
+            {conversation?.mode === "screening" ? (
               <span className="shrink-0 text-xs text-ink-500">
                 {resultsPage?.summary.keepCount ?? 0} keep
               </span>
@@ -99,10 +99,12 @@ export function ResultsPanel({
             </div>
           ) : (
             <div className="px-4 py-4 text-sm text-ink-500">
-              {query
-                ? isLoading
-                  ? "正在同步论文..."
-                  : "这次筛选还没有候选论文。"
+              {conversation
+                ? conversation.mode === "screening"
+                  ? isLoading
+                    ? "正在同步论文..."
+                    : "这次筛选还没有候选论文。"
+                  : "当前是自由聊天；等你执行筛选、阅读或引用论文后，这里会显示相关上下文。"
                 : "对话开始后，这里会显示筛选出来的论文。"}
             </div>
           )}

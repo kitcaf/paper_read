@@ -1,13 +1,7 @@
-import type {
-  ScreeningQueryDetail,
-  ScreeningResultsPage,
-  SourceSummary
-} from "@paper-read/shared";
+import type { LocalMessageRecord, ScreeningResultsPage, SourceSummary } from "@paper-read/shared";
 
-import {
-  formatConversationTimestamp,
-  formatSourceLabel
-} from "./presentation";
+import type { WorkspaceConversationDetail } from "./workspaceTypes";
+import { formatConversationTimestamp, formatSourceLabel } from "./presentation";
 
 type ConversationRole = "assistant" | "user";
 type ConversationVariant = "default" | "success" | "warning" | "error";
@@ -28,97 +22,183 @@ export interface ConversationMessage {
 }
 
 function buildProgressMessage(
-  query: ScreeningQueryDetail,
+  conversation: WorkspaceConversationDetail,
   resultsPage: ScreeningResultsPage | null
 ): Pick<ConversationMessage, "title" | "body" | "variant"> {
-  if (query.status === "failed") {
+  if (conversation.status === "failed") {
     return {
       title: "筛选失败",
-      body: query.lastError ?? "这次筛选没有顺利完成，可以稍后重新刷新结果。",
+      body: conversation.lastError ?? "这次筛选没有顺利完成，可以稍后重新刷新结果。",
       variant: "error"
     };
   }
 
-  if (query.status === "completed") {
-    const keepCount = resultsPage?.summary.keepCount ?? query.matchedPapers;
+  if (conversation.status === "completed") {
+    const keepCount = resultsPage?.summary.keepCount ?? conversation.matchedPapers;
 
     return {
       title: "筛选完成",
-      body: `已完成 ${query.processedPapers}/${query.totalPapers} 篇论文筛选，当前保留 ${keepCount} 篇候选论文。`,
+      body: `已完成 ${conversation.processedPapers}/${conversation.totalPapers} 篇论文筛选，当前保留 ${keepCount} 篇候选论文。`,
       variant: "success"
     };
   }
 
-  if (query.status === "queued") {
+  if (conversation.status === "queued") {
     return {
       title: "已开始",
-      body: `请求已进入队列，准备读取 ${query.totalPapers || "当前源中的"}论文标题并启动首轮筛选。`,
+      body: `请求已进入队列，准备读取 ${conversation.totalPapers || "当前源中的"}论文标题并启动首轮筛选。`,
       variant: "warning"
     };
   }
 
   return {
     title: "正在筛选",
-    body: `已处理 ${query.processedPapers}/${query.totalPapers} 篇论文，当前保留 ${query.matchedPapers} 篇候选论文。`,
+    body: `已处理 ${conversation.processedPapers}/${conversation.totalPapers} 篇论文，当前保留 ${conversation.matchedPapers} 篇候选论文。`,
     variant: "default"
   };
 }
 
-export function buildConversationMessages(
-  query: ScreeningQueryDetail,
-  resultsPage: ScreeningResultsPage | null,
-  sources: SourceSummary[]
-) {
-  const sourceLabel = formatSourceLabel(query.sourceKey, sources);
-  const progressMessage = buildProgressMessage(query, resultsPage);
+function mapLocalMessageToConversationMessage(message: LocalMessageRecord): ConversationMessage | null {
+  const timestamp = formatConversationTimestamp(message.createdAt);
+
+  if (message.role === "user") {
+    return {
+      id: message.id,
+      role: "user",
+      body: message.content,
+      meta: timestamp
+    };
+  }
+
+  if (message.role === "assistant") {
+    const modelLabel =
+      typeof message.metadata.modelProfileName === "string"
+        ? message.metadata.modelProfileName
+        : typeof message.metadata.modelName === "string"
+          ? message.metadata.modelName
+          : undefined;
+
+    return {
+      id: message.id,
+      role: "assistant",
+      body: message.content,
+      meta: modelLabel ? `${timestamp} · ${modelLabel}` : timestamp,
+      variant: "default"
+    };
+  }
+
+  const toolLabel =
+    typeof message.metadata.tool === "string"
+      ? message.metadata.tool
+      : typeof message.metadata.step === "string"
+        ? message.metadata.step
+        : "tool";
+
+  return {
+    id: message.id,
+    role: "assistant",
+    title: "工具执行",
+    body: message.content,
+    meta: timestamp,
+    chips: [
+      {
+        id: `${message.id}:tool`,
+        label: toolLabel
+      }
+    ],
+    variant: "default"
+  };
+}
+
+function buildChatConversationMessages(
+  conversation: WorkspaceConversationDetail
+): ConversationMessage[] {
+  const mappedMessages = conversation.messages
+    .map(mapLocalMessageToConversationMessage)
+    .filter((message): message is ConversationMessage => Boolean(message));
+
+  if (mappedMessages.length) {
+    return mappedMessages;
+  }
 
   return [
     {
-      id: `${query.id}:user`,
+      id: `${conversation.id}:empty`,
+      role: "assistant",
+      body: "先发一条消息吧，我现在已经可以直接自由聊天了。",
+      variant: "default"
+    }
+  ];
+}
+
+function buildScreeningConversationMessages(
+  conversation: WorkspaceConversationDetail,
+  resultsPage: ScreeningResultsPage | null,
+  sources: SourceSummary[]
+) {
+  const sourceLabel = formatSourceLabel(conversation.sourceKey ?? "local", sources);
+  const progressMessage = buildProgressMessage(conversation, resultsPage);
+
+  return [
+    {
+      id: `${conversation.id}:user`,
       role: "user",
-      body: query.queryText,
-      meta: formatConversationTimestamp(query.createdAt),
+      body: conversation.queryText,
+      meta: formatConversationTimestamp(conversation.createdAt),
       chips: [
         {
-          id: `${query.id}:tool`,
+          id: `${conversation.id}:tool`,
           label: "筛选论文"
         },
         {
-          id: `${query.id}:source`,
+          id: `${conversation.id}:source`,
           label: sourceLabel
         }
       ]
     },
     {
-      id: `${query.id}:started`,
+      id: `${conversation.id}:started`,
       role: "assistant",
       title: "已开始",
       body: `正在从 ${sourceLabel} 中读取论文标题，并准备这次主题筛选。`,
-      meta: formatConversationTimestamp(query.createdAt),
-      variant: query.status === "failed" ? "warning" : "default"
+      meta: formatConversationTimestamp(conversation.createdAt),
+      variant: conversation.status === "failed" ? "warning" : "default"
     },
     {
-      id: `${query.id}:intent`,
+      id: `${conversation.id}:intent`,
       role: "assistant",
       title: "意图分析",
       body:
-        query.intentSummary ??
+        conversation.intentSummary ??
         "正在根据你的主题描述提取关注方向，并生成这一轮筛选判断依据。",
       chips:
-        query.intentJson?.focusTerms.map((item) => ({
-          id: `${query.id}:focus:${item}`,
+        conversation.intentJson?.focusTerms.map((item) => ({
+          id: `${conversation.id}:focus:${item}`,
           label: item
         })) ?? [],
       variant: "default"
     },
     {
-      id: `${query.id}:progress`,
+      id: `${conversation.id}:progress`,
       role: "assistant",
       title: progressMessage.title,
       body: progressMessage.body,
-      meta:
-        query.completedAt ? formatConversationTimestamp(query.completedAt) : undefined,
+      meta: conversation.completedAt
+        ? formatConversationTimestamp(conversation.completedAt)
+        : undefined,
       variant: progressMessage.variant
     }
   ] satisfies ConversationMessage[];
+}
+
+export function buildConversationMessages(
+  conversation: WorkspaceConversationDetail,
+  resultsPage: ScreeningResultsPage | null,
+  sources: SourceSummary[]
+) {
+  if (conversation.mode === "chat") {
+    return buildChatConversationMessages(conversation);
+  }
+
+  return buildScreeningConversationMessages(conversation, resultsPage, sources);
 }

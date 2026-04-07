@@ -1,4 +1,4 @@
-import type { ScreeningQuerySummary, SourceSummary } from "@paper-read/shared";
+import type { SourceSummary } from "@paper-read/shared";
 import { ChevronLeft, Plus, Settings } from "lucide-react";
 
 import {
@@ -7,22 +7,23 @@ import {
   getQueryStatusVariant,
   truncateText
 } from "../presentation";
+import type { WorkspaceConversationSummary } from "../workspaceTypes";
 
 interface HistorySidebarProps {
-  queries: ScreeningQuerySummary[];
+  conversations: WorkspaceConversationSummary[];
   sources: SourceSummary[];
-  selectedQueryId: string | null;
-  onSelectQuery: (queryId: string) => void;
+  selectedConversationId: string | null;
+  onSelectConversation: (conversationId: string) => void;
   onCreateChat: () => void;
   onToggleSidebar: () => void;
   onOpenSettings: () => void;
 }
 
 export function HistorySidebar({
-  queries,
+  conversations,
   sources,
-  selectedQueryId,
-  onSelectQuery,
+  selectedConversationId,
+  onSelectConversation,
   onCreateChat,
   onToggleSidebar,
   onOpenSettings
@@ -61,14 +62,17 @@ export function HistorySidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3">
-        {queries.length ? (
+        {conversations.length ? (
           <ul className="space-y-1">
-            {queries.map((query) => {
-              const statusVariant = getQueryStatusVariant(query.status);
-              const isActive = query.id === selectedQueryId;
+            {conversations.map((conversation) => {
+              const statusVariant =
+                conversation.mode === "screening"
+                  ? getQueryStatusVariant(conversation.status)
+                  : null;
+              const isActive = conversation.id === selectedConversationId;
 
               return (
-                <li key={query.id}>
+                <li key={conversation.id}>
                   <button
                     className={[
                       "w-full rounded-[14px] border px-3 py-3 text-left transition duration-200",
@@ -77,19 +81,23 @@ export function HistorySidebar({
                         : "border-transparent bg-transparent hover:border-white/70 hover:bg-white/72"
                     ].join(" ")}
                     type="button"
-                    onClick={() => onSelectQuery(query.id)}
+                    onClick={() => onSelectConversation(conversation.id)}
                   >
                     <p className="truncate text-sm font-medium text-ink-900">
-                      {truncateText(query.queryTitle, 28)}
+                      {truncateText(conversation.title, 28)}
                     </p>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className="truncate text-xs text-ink-500">
-                        {formatSourceLabel(query.sourceKey, sources)}
+                        {conversation.mode === "screening" && conversation.sourceKey
+                          ? formatSourceLabel(conversation.sourceKey, sources)
+                          : "自由聊天"}
                       </span>
-                      <span className={statusVariant.badgeClassName}>{query.status}</span>
+                      {statusVariant ? (
+                        <span className={statusVariant.badgeClassName}>{conversation.status}</span>
+                      ) : null}
                     </div>
                     <p className="mt-2 text-xs text-ink-400">
-                      {formatConversationTimestamp(query.createdAt)}
+                      {formatConversationTimestamp(conversation.createdAt)}
                     </p>
                   </button>
                 </li>

@@ -1,4 +1,4 @@
-import type { ModelProviderProfile, ScreeningQueryOptions, SourceSummary } from "@paper-read/shared";
+import type { ModelProviderProfile, SourceSummary } from "@paper-read/shared";
 import type { FormEvent } from "react";
 import { ArrowUp, ChevronDown, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -8,6 +8,20 @@ import { formatSourceLabel } from "../presentation";
 import { ModelProfilePicker } from "./ModelProfilePicker";
 import { ScreeningSourceDialog } from "./ScreeningSourceDialog";
 
+type ComposerSubmitInput =
+  | {
+      mode: "chat";
+      queryText: string;
+      modelProfileId?: string;
+    }
+  | {
+      mode: "screening";
+      sourceKey: string;
+      queryText: string;
+      modelProfileId?: string;
+      options: { threshold?: number; includeReasoning?: boolean };
+    };
+
 interface QueryComposerProps {
   sources: SourceSummary[];
   modelProfiles: ModelProviderProfile[];
@@ -15,12 +29,7 @@ interface QueryComposerProps {
   defaultModelProfileId?: string;
   resetKey: number;
   isSubmitting: boolean;
-  onSubmit: (input: {
-    sourceKey: string;
-    queryText: string;
-    modelProfileId?: string;
-    options: ScreeningQueryOptions;
-  }) => Promise<boolean> | boolean;
+  onSubmit: (input: ComposerSubmitInput) => Promise<boolean> | boolean;
 }
 
 export function QueryComposer({
@@ -110,7 +119,7 @@ export function QueryComposer({
               placeholder={
                 activeSourceKey
                   ? "输入你想筛选的研究主题或问题..."
-                  : "先选择“筛选论文”工具，再输入你的研究主题..."
+                  : "直接和 PaperRead 对话，或先选择“筛选论文”工具..."
               }
               disabled={isSubmitting}
             />
@@ -150,7 +159,7 @@ export function QueryComposer({
               aria-label="Send message"
               className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink-900 text-paper-50 transition hover:bg-ink-800 disabled:cursor-not-allowed disabled:bg-ink-500"
               type="submit"
-              disabled={isSubmitting || !queryText.trim() || !sources.length || !canSubmit}
+              disabled={isSubmitting || !queryText.trim() || !canSubmit}
             >
               <ArrowUp className="h-4 w-4" />
             </button>

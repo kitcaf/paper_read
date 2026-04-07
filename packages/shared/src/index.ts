@@ -184,6 +184,7 @@ export type AgentCommandType =
   | "model.profiles.delete"
   | "model.profiles.set_default"
   | "model.profile.test"
+  | "chat.start"
   | "screening.start"
   | "screening.results.get"
   | "conversation.list"
@@ -213,6 +214,10 @@ export type AgentCommand =
   | AgentCommandWithPayload<
       "model.profile.test",
       { profileId?: string; profile?: ModelProviderProfileInput }
+    >
+  | AgentCommandWithPayload<
+      "chat.start",
+      { conversationId?: string; messageText: string; modelProfileId?: string }
     >
   | AgentCommandWithPayload<
       "screening.start",
