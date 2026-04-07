@@ -8,6 +8,7 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ModalRoot } from "../../../components/ModalRoot";
+import { Button } from "../../../components/ui/button";
 import { ModelProfileForm } from "./ModelProfileForm";
 import { ModelProfileList } from "./ModelProfileList";
 import {
@@ -173,14 +174,10 @@ export function ModelSettingsDialog({
               可以配置多个模型；发起对话时可选择其中一个模型配置。
             </p>
           </div>
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-ink-300/45 bg-white px-4 text-sm font-medium text-ink-700 transition hover:border-ink-300/65"
-            type="button"
-            onClick={handleCreateProfile}
-          >
+          <Button variant="secondary" onClick={handleCreateProfile}>
             <Plus className="h-4 w-4" />
             新增模型
-          </button>
+          </Button>
         </div>
 
         {errorMessage ? (
