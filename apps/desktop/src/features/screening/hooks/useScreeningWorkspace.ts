@@ -1,4 +1,9 @@
-import type { ScreeningQueryOptions, ScreeningResultsPage, SourceSummary } from "@paper-read/shared";
+import type {
+  LocalMessageRecord,
+  ScreeningQueryOptions,
+  ScreeningResultsPage,
+  SourceSummary
+} from "@paper-read/shared";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 
 import {
@@ -32,6 +37,88 @@ type SubmitConversationInput = SubmitChatInput | SubmitScreeningInput;
 
 const ACTIVE_QUERY_STATUSES = new Set(["queued", "running"]);
 const POLLING_INTERVAL_MS = 2500;
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function createOptimisticChatMessages(
+  conversationId: string,
+  existingMessages: LocalMessageRecord[],
+  queryText: string
+) {
+  const userTimestamp = nowIso();
+  const assistantTimestamp = new Date(Date.now() + 1).toISOString();
+
+  return [
+    ...existingMessages,
+    {
+      id: `temp-user-${crypto.randomUUID()}`,
+      conversationId,
+      role: "user" as const,
+      content: queryText,
+      metadata: {
+        optimistic: true
+      },
+      createdAt: userTimestamp
+    },
+    {
+      id: `temp-assistant-${crypto.randomUUID()}`,
+      conversationId,
+      role: "assistant" as const,
+      content: "正在思考...",
+      metadata: {
+        pending: true,
+        optimistic: true
+      },
+      createdAt: assistantTimestamp
+    }
+  ];
+}
+
+function createOptimisticChatConversation(
+  currentConversation: WorkspaceConversationDetail | null,
+  queryText: string
+): WorkspaceConversationDetail {
+  const conversationId =
+    currentConversation?.mode === "chat"
+      ? currentConversation.id
+      : `temp-chat-${crypto.randomUUID()}`;
+  const createdAt =
+    currentConversation?.mode === "chat" ? currentConversation.createdAt : nowIso();
+  const updatedAt = nowIso();
+
+  return {
+    id: conversationId,
+    title:
+      currentConversation?.mode === "chat"
+        ? currentConversation.title
+        : queryText.slice(0, 80) || "新对话",
+    preview: queryText,
+    mode: "chat",
+    sourceLabel: "自由聊天",
+    status: "running",
+    modelProfileId: currentConversation?.modelProfileId,
+    modelProfileName: currentConversation?.modelProfileName,
+    createdAt,
+    updatedAt,
+    queryText,
+    messages: createOptimisticChatMessages(
+      conversationId,
+      currentConversation?.mode === "chat" ? currentConversation.messages : [],
+      queryText
+    ),
+    options: {},
+    intentSummary: null,
+    intentJson: null,
+    lastError: null,
+    totalPapers: 0,
+    processedPapers: 0,
+    matchedPapers: 0,
+    failedPapers: 0,
+    completedAt: null
+  };
+}
 
 export function useScreeningWorkspace() {
   const [sources, setSources] = useState<SourceSummary[]>([]);
@@ -162,6 +249,20 @@ export function useScreeningWorkspace() {
 
     try {
       if (input.mode === "chat") {
+        const optimisticConversation = createOptimisticChatConversation(
+          selectedConversation,
+          input.queryText
+        );
+
+        startTransition(() => {
+          setSelectedConversation(optimisticConversation);
+          setResultsPage(null);
+        });
+
+        if (selectedConversation?.mode !== "chat") {
+          setSelectedConversationId(null);
+        }
+
         const nextConversation = await sendChatMessage({
           messageText: input.queryText,
           conversationId:
