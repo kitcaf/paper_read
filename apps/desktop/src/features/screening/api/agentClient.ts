@@ -32,6 +32,8 @@ type AgentCommandInput = AgentCommand extends infer TCommand
     : never
   : never;
 
+type AgentEventListener = (event: AgentEvent) => void;
+
 function createCommandId() {
   return crypto.randomUUID();
 }
@@ -47,6 +49,7 @@ function parseAgentEvents(rawPayload: string) {
 class AgentClient {
   private pendingRequests = new Map<string, PendingRequest>();
   private eventWaiters: EventWaiter[] = [];
+  private eventListeners = new Set<AgentEventListener>();
   private listenerPromise: Promise<void> | null = null;
   private bootstrapPromise: Promise<void> | null = null;
   private workspacePath: string | null = null;
@@ -88,6 +91,15 @@ class AgentClient {
     });
 
     return responsePromise;
+  }
+
+  subscribe(listener: AgentEventListener) {
+    this.eventListeners.add(listener);
+    void this.ensureListeners();
+
+    return () => {
+      this.eventListeners.delete(listener);
+    };
   }
 
   private async bootstrap() {
@@ -184,6 +196,7 @@ class AgentClient {
 
   private handleRawEvent(rawPayload: string) {
     for (const event of parseAgentEvents(rawPayload)) {
+      this.notifyEventListeners(event);
       this.resolveEventWaiters(event);
 
       if (event.type === "agent.error") {
@@ -207,6 +220,16 @@ class AgentClient {
       window.clearTimeout(pendingRequest.timeoutId);
       this.pendingRequests.delete(event.id);
       pendingRequest.resolve(event);
+    }
+  }
+
+  private notifyEventListeners(event: AgentEvent) {
+    for (const listener of this.eventListeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error("Agent event listener failed.", error);
+      }
     }
   }
 

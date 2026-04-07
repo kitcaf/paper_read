@@ -288,7 +288,7 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
       mode: "chat",
       metadata: {
         lastUserMessage: command.payload.messageText,
-        status: "completed",
+        status: "running",
         modelProfileId: selectedModelProfile.profile.id,
         modelProfileName: selectedModelProfile.profile.name
       }
@@ -304,6 +304,15 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
     }
   });
 
+  updateConversationMetadata(db, conversationId, {
+    lastUserMessage: command.payload.messageText,
+    status: "running",
+    modelProfileId: selectedModelProfile.profile.id,
+    modelProfileName: selectedModelProfile.profile.name,
+    modelName: modelRuntime.settings.modelName,
+    modelProvider: modelRuntime.provider.kind
+  });
+
   emit({
     id: command.id,
     type: "model.provider_ready",
@@ -317,32 +326,76 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
     }
   });
 
-  const reply = await generateChatReply(modelRuntime, listMessages(db, conversationId));
-  createMessage(db, {
-    conversationId,
-    role: "assistant",
-    content: reply.content,
-    metadata: {
-      provider: reply.metadata.provider,
-      modelName: reply.metadata.modelName,
+  emit({
+    id: command.id,
+    type: "chat.started",
+    payload: {
+      conversationId,
       modelProfileId: selectedModelProfile.profile.id,
-      modelProfileName: selectedModelProfile.profile.name,
-      usedStreamingFallback: reply.metadata.usedStreamingFallback,
-      ...(reply.metadata.streamingFallbackReason
-        ? { streamingFallbackReason: reply.metadata.streamingFallbackReason }
-        : {})
+      modelProfileName: selectedModelProfile.profile.name
     }
   });
 
-  updateConversationMetadata(db, conversationId, {
-    lastUserMessage: command.payload.messageText,
-    lastAssistantMessage: reply.content,
-    status: "completed",
-    modelProvider: modelRuntime.provider.kind,
-    modelProfileId: selectedModelProfile.profile.id,
-    modelProfileName: selectedModelProfile.profile.name,
-    modelName: modelRuntime.settings.modelName
-  });
+  try {
+    const reply = await generateChatReply(modelRuntime, listMessages(db, conversationId), {
+      onTextChunk: (chunk) => {
+        emit({
+          id: command.id,
+          type: "chat.delta",
+          payload: {
+            conversationId,
+            delta: chunk
+          }
+        });
+      }
+    });
+    const assistantMessageId = createMessage(db, {
+      conversationId,
+      role: "assistant",
+      content: reply.content,
+      metadata: {
+        provider: reply.metadata.provider,
+        modelName: reply.metadata.modelName,
+        modelProfileId: selectedModelProfile.profile.id,
+        modelProfileName: selectedModelProfile.profile.name,
+        usedStreamingFallback: reply.metadata.usedStreamingFallback,
+        ...(reply.metadata.streamingFallbackReason
+          ? { streamingFallbackReason: reply.metadata.streamingFallbackReason }
+          : {})
+      }
+    });
+
+    emit({
+      id: command.id,
+      type: "chat.completed",
+      payload: {
+        conversationId,
+        messageId: assistantMessageId
+      }
+    });
+
+    updateConversationMetadata(db, conversationId, {
+      lastUserMessage: command.payload.messageText,
+      lastAssistantMessage: reply.content,
+      status: "completed",
+      lastError: null,
+      modelProvider: modelRuntime.provider.kind,
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name,
+      modelName: modelRuntime.settings.modelName
+    });
+  } catch (error) {
+    updateConversationMetadata(db, conversationId, {
+      lastUserMessage: command.payload.messageText,
+      status: "failed",
+      lastError: error instanceof Error ? error.message : "Chat generation failed.",
+      modelProvider: modelRuntime.provider.kind,
+      modelProfileId: selectedModelProfile.profile.id,
+      modelProfileName: selectedModelProfile.profile.name,
+      modelName: modelRuntime.settings.modelName
+    });
+    throw error;
+  }
 
   const conversation = listConversations(db).find((item) => item.id === conversationId);
   if (!conversation) {

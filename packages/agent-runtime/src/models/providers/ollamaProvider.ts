@@ -54,7 +54,16 @@ export const ollamaProvider: ModelProvider = {
 
     await ensureOkResponse(response, "Ollama provider");
     if (request.stream) {
-      const chunks = await readNdjsonChunks(response);
+      const chunks = await readNdjsonChunks(response, (chunk) => {
+        try {
+          const textChunk = readOllamaContent(chunk);
+          if (textChunk) {
+            request.onTextChunk?.(textChunk);
+          }
+        } catch {
+          // ignore non-text stream chunks
+        }
+      });
       const content = readOllamaStreamContent(chunks);
       if (!content) {
         throw new Error("Ollama provider returned an empty streaming completion.");

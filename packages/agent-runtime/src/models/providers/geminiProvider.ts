@@ -64,6 +64,14 @@ function readGeminiContent(payload: unknown) {
   return content;
 }
 
+function readGeminiStreamDelta(chunk: unknown) {
+  try {
+    return readGeminiContent(chunk);
+  } catch {
+    return "";
+  }
+}
+
 function createGeminiEndpoint(baseUrl: string, modelName: string, isStreaming: boolean) {
   const action = isStreaming ? "streamGenerateContent?alt=sse" : "generateContent";
   return `${trimTrailingSlash(baseUrl)}/models/${encodeURIComponent(modelName)}:${action}`;
@@ -96,7 +104,12 @@ export const geminiProvider: ModelProvider = {
     await ensureOkResponse(response, "Gemini provider");
 
     if (request.stream) {
-      const chunks = await readSseJsonChunks(response);
+      const chunks = await readSseJsonChunks(response, (chunk) => {
+        const textChunk = readGeminiStreamDelta(chunk);
+        if (textChunk) {
+          request.onTextChunk?.(textChunk);
+        }
+      });
       const content = chunks.map(readGeminiContent).join("").trim();
       if (!content) {
         throw new Error("Gemini provider returned an empty streaming completion.");

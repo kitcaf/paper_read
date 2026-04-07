@@ -248,6 +248,9 @@ export type AgentEventType =
   | "model.provider_ready"
   | "conversation.listed"
   | "conversation.loaded"
+  | "chat.started"
+  | "chat.delta"
+  | "chat.completed"
   | "screening.started"
   | "screening.intent_analyzed"
   | "screening.paper_scored"
@@ -322,6 +325,28 @@ export type AgentEvent =
   | AgentEventBase<
       "conversation.loaded",
       { conversation: LocalConversationSummary; messages: LocalMessageRecord[] }
+    >
+  | AgentEventBase<
+      "chat.started",
+      {
+        conversationId: string;
+        modelProfileId?: string;
+        modelProfileName?: string;
+      }
+    >
+  | AgentEventBase<
+      "chat.delta",
+      {
+        conversationId: string;
+        delta: string;
+      }
+    >
+  | AgentEventBase<
+      "chat.completed",
+      {
+        conversationId: string;
+        messageId: string;
+      }
     >
   | AgentEventBase<
       "screening.started",

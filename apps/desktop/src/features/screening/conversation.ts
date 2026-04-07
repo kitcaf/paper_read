@@ -1,7 +1,7 @@
 import type { LocalMessageRecord, ScreeningResultsPage, SourceSummary } from "@paper-read/shared";
 
 import type { WorkspaceConversationDetail } from "./workspaceTypes";
-import { formatConversationTimestamp, formatSourceLabel } from "./presentation";
+import { formatSourceLabel } from "./presentation";
 
 type ConversationRole = "assistant" | "user";
 type ConversationVariant = "default" | "success" | "warning" | "error";
@@ -16,9 +16,11 @@ export interface ConversationMessage {
   role: ConversationRole;
   title?: string;
   body: string;
-  meta?: string;
   chips?: ConversationChip[];
   variant?: ConversationVariant;
+  animate?: boolean;
+  pending?: boolean;
+  streaming?: boolean;
 }
 
 function buildProgressMessage(
@@ -59,31 +61,23 @@ function buildProgressMessage(
 }
 
 function mapLocalMessageToConversationMessage(message: LocalMessageRecord): ConversationMessage | null {
-  const timestamp = formatConversationTimestamp(message.createdAt);
-
   if (message.role === "user") {
     return {
       id: message.id,
       role: "user",
-      body: message.content,
-      meta: timestamp
+      body: message.content
     };
   }
 
   if (message.role === "assistant") {
-    const modelLabel =
-      typeof message.metadata.modelProfileName === "string"
-        ? message.metadata.modelProfileName
-        : typeof message.metadata.modelName === "string"
-          ? message.metadata.modelName
-          : undefined;
-
     return {
       id: message.id,
       role: "assistant",
       body: message.content,
-      meta: modelLabel ? `${timestamp} · ${modelLabel}` : timestamp,
-      variant: "default"
+      variant: "default",
+      animate: Boolean(message.metadata.clientAnimate),
+      pending: Boolean(message.metadata.pending),
+      streaming: Boolean(message.metadata.streaming)
     };
   }
 
@@ -99,7 +93,6 @@ function mapLocalMessageToConversationMessage(message: LocalMessageRecord): Conv
     role: "assistant",
     title: "工具执行",
     body: message.content,
-    meta: timestamp,
     chips: [
       {
         id: `${message.id}:tool`,
@@ -144,7 +137,6 @@ function buildScreeningConversationMessages(
       id: `${conversation.id}:user`,
       role: "user",
       body: conversation.queryText,
-      meta: formatConversationTimestamp(conversation.createdAt),
       chips: [
         {
           id: `${conversation.id}:tool`,
@@ -161,7 +153,6 @@ function buildScreeningConversationMessages(
       role: "assistant",
       title: "已开始",
       body: `正在从 ${sourceLabel} 中读取论文标题，并准备这次主题筛选。`,
-      meta: formatConversationTimestamp(conversation.createdAt),
       variant: conversation.status === "failed" ? "warning" : "default"
     },
     {
@@ -183,9 +174,6 @@ function buildScreeningConversationMessages(
       role: "assistant",
       title: progressMessage.title,
       body: progressMessage.body,
-      meta: conversation.completedAt
-        ? formatConversationTimestamp(conversation.completedAt)
-        : undefined,
       variant: progressMessage.variant
     }
   ] satisfies ConversationMessage[];

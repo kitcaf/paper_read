@@ -66,6 +66,11 @@ function readCompletionStreamContent(chunks: unknown[]) {
     .trim();
 }
 
+function readCompletionStreamDelta(chunk: unknown) {
+  const streamChunk = chunk as ChatCompletionStreamChunk;
+  return streamChunk.choices?.[0]?.delta?.content ?? "";
+}
+
 export async function requestChatCompletion({
   providerName,
   baseUrl,
@@ -90,7 +95,12 @@ export async function requestChatCompletion({
   await ensureOkResponse(response, providerName);
 
   if (request.stream) {
-    const chunks = await readSseJsonChunks(response);
+    const chunks = await readSseJsonChunks(response, (chunk) => {
+      const textChunk = readCompletionStreamDelta(chunk);
+      if (textChunk) {
+        request.onTextChunk?.(textChunk);
+      }
+    });
     const content = readCompletionStreamContent(chunks);
     if (!content) {
       throw new Error(`${providerName} returned an empty streaming completion.`);

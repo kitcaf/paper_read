@@ -3,6 +3,7 @@ import type { LocalMessageRecord } from "@paper-read/shared";
 import { generateWithStreamingFallback } from "./models/generate";
 import type { ModelMessage, ModelRuntime } from "./models/types";
 
+// 系统提示词
 const CHAT_SYSTEM_PROMPT = [
   "You are PaperRead, a focused research agent for academic paper exploration.",
   "You can chat naturally, help users reason about research topics, and support paper-related workflows when the app provides tools and context.",
@@ -42,12 +43,16 @@ export interface ChatModelReply {
 
 export async function generateChatReply(
   runtime: ModelRuntime,
-  history: LocalMessageRecord[]
+  history: LocalMessageRecord[],
+  options?: {
+    onTextChunk?: (chunk: string) => void;
+  }
 ): Promise<ChatModelReply> {
   const response = await generateWithStreamingFallback(runtime, {
     messages: toModelMessages(history),
     responseFormat: "text",
-    stream: runtime.settings.stream
+    stream: runtime.settings.stream,
+    onTextChunk: options?.onTextChunk
   });
 
   const content = response.content.trim();

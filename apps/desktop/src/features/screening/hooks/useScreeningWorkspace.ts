@@ -1,10 +1,11 @@
 import type {
+  AgentEvent,
   LocalMessageRecord,
   ScreeningQueryOptions,
   ScreeningResultsPage,
   SourceSummary
 } from "@paper-read/shared";
-import { useEffect, useEffectEvent, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 
 import {
   createScreeningQuery,
@@ -12,7 +13,8 @@ import {
   getScreeningResults,
   listScreeningQueries,
   listSources,
-  sendChatMessage
+  sendChatMessage,
+  subscribeToAgentEvents
 } from "../api/screeningApi";
 import type {
   WorkspaceConversationDetail,
@@ -66,7 +68,7 @@ function createOptimisticChatMessages(
       id: `temp-assistant-${crypto.randomUUID()}`,
       conversationId,
       role: "assistant" as const,
-      content: "正在思考...",
+      content: "",
       metadata: {
         pending: true,
         optimistic: true
@@ -120,6 +122,114 @@ function createOptimisticChatConversation(
   };
 }
 
+function updateLatestAssistantMessage(
+  messages: LocalMessageRecord[],
+  updater: (message: LocalMessageRecord) => LocalMessageRecord
+) {
+  const targetIndex = [...messages]
+    .map((message) => message.role)
+    .lastIndexOf("assistant");
+
+  if (targetIndex < 0) {
+    return messages;
+  }
+
+  return messages.map((message, index) =>
+    index === targetIndex ? updater(message) : message
+  );
+}
+
+function markLatestAssistantMessageForAnimation(
+  conversation: WorkspaceConversationDetail
+): WorkspaceConversationDetail {
+  const latestAssistantIndex = [...conversation.messages]
+    .map((message) => message.role)
+    .lastIndexOf("assistant");
+
+  if (latestAssistantIndex < 0) {
+    return conversation;
+  }
+
+  return {
+    ...conversation,
+    messages: conversation.messages.map((message, index) =>
+      index === latestAssistantIndex
+        ? {
+            ...message,
+            metadata: {
+              ...message.metadata,
+              clientAnimate: true,
+              pending: false,
+              streaming: false
+            }
+          }
+        : message
+    )
+  };
+}
+
+function attachStreamingConversationId(
+  conversation: WorkspaceConversationDetail,
+  conversationId: string,
+  profile?: { id?: string; name?: string }
+): WorkspaceConversationDetail {
+  return {
+    ...conversation,
+    id: conversationId,
+    status: "running",
+    modelProfileId: profile?.id ?? conversation.modelProfileId,
+    modelProfileName: profile?.name ?? conversation.modelProfileName,
+    messages: conversation.messages.map((message) =>
+      message.conversationId === conversationId
+        ? message
+        : {
+            ...message,
+            conversationId
+          }
+    )
+  };
+}
+
+function appendStreamingAssistantDelta(
+  conversation: WorkspaceConversationDetail,
+  conversationId: string,
+  delta: string
+): WorkspaceConversationDetail {
+  return {
+    ...conversation,
+    id: conversationId,
+    status: "running",
+    messages: updateLatestAssistantMessage(conversation.messages, (message) => ({
+      ...message,
+      conversationId,
+      content: `${message.content}${delta}`,
+      metadata: {
+        ...message.metadata,
+        pending: false,
+        streaming: true,
+        optimistic: false,
+        clientAnimate: false
+      }
+    }))
+  };
+}
+
+function clearStreamingMessageState(
+  conversation: WorkspaceConversationDetail
+): WorkspaceConversationDetail {
+  return {
+    ...conversation,
+    messages: updateLatestAssistantMessage(conversation.messages, (message) => ({
+      ...message,
+      metadata: {
+        ...message.metadata,
+        pending: false,
+        streaming: false
+      }
+    }))
+  };
+}
+
 export function useScreeningWorkspace() {
   const [sources, setSources] = useState<SourceSummary[]>([]);
   const [conversationHistory, setConversationHistory] = useState<WorkspaceConversationSummary[]>([]);
@@ -133,6 +243,30 @@ export function useScreeningWorkspace() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [composerResetKey, setComposerResetKey] = useState(0);
   const [isPending, startTransition] = useTransition();
+  const chatStreamRef = useRef<{
+    conversationId: string | null;
+    bufferedDelta: string;
+    hasReceivedDelta: boolean;
+    frameId: number | null;
+  }>({
+    conversationId: null,
+    bufferedDelta: "",
+    hasReceivedDelta: false,
+    frameId: null
+  });
+
+  const clearChatStreamState = useEffectEvent(() => {
+    if (chatStreamRef.current.frameId !== null) {
+      window.cancelAnimationFrame(chatStreamRef.current.frameId);
+    }
+
+    chatStreamRef.current = {
+      conversationId: null,
+      bufferedDelta: "",
+      hasReceivedDelta: false,
+      frameId: null
+    };
+  });
 
   const loadConversationHistoryEvent = useEffectEvent(async () => {
     const response = await listScreeningQueries();
@@ -142,6 +276,54 @@ export function useScreeningWorkspace() {
 
     return response.items;
   });
+
+  const flushChatStreamDelta = useEffectEvent(() => {
+    const { conversationId, bufferedDelta } = chatStreamRef.current;
+    chatStreamRef.current.frameId = null;
+
+    if (!conversationId || !bufferedDelta) {
+      chatStreamRef.current.bufferedDelta = "";
+      return;
+    }
+
+    chatStreamRef.current.bufferedDelta = "";
+    startTransition(() => {
+      setSelectedConversation((currentConversation) => {
+        if (!currentConversation || currentConversation.mode !== "chat") {
+          return currentConversation;
+        }
+
+        if (
+          currentConversation.id !== conversationId &&
+          !currentConversation.id.startsWith("temp-chat-")
+        ) {
+          return currentConversation;
+        }
+
+        return appendStreamingAssistantDelta(
+          currentConversation,
+          conversationId,
+          bufferedDelta
+        );
+      });
+    });
+  });
+
+  const queueChatStreamDelta = useEffectEvent(
+    (event: Extract<AgentEvent, { type: "chat.delta" }>) => {
+      chatStreamRef.current.conversationId = event.payload.conversationId;
+      chatStreamRef.current.bufferedDelta += event.payload.delta;
+      chatStreamRef.current.hasReceivedDelta = true;
+
+      if (chatStreamRef.current.frameId !== null) {
+        return;
+      }
+
+      chatStreamRef.current.frameId = window.requestAnimationFrame(() => {
+        flushChatStreamDelta();
+      });
+    }
+  );
 
   const loadSelectedConversationEvent = useEffectEvent(
     async (conversationId: string, options?: { silent?: boolean }) => {
@@ -216,6 +398,44 @@ export function useScreeningWorkspace() {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = subscribeToAgentEvents((event) => {
+      if (event.type === "chat.started") {
+        chatStreamRef.current.conversationId = event.payload.conversationId;
+        chatStreamRef.current.bufferedDelta = "";
+        chatStreamRef.current.hasReceivedDelta = false;
+
+        startTransition(() => {
+          setSelectedConversation((currentConversation) => {
+            if (!currentConversation || currentConversation.mode !== "chat") {
+              return currentConversation;
+            }
+
+            return attachStreamingConversationId(
+              currentConversation,
+              event.payload.conversationId,
+              {
+                id: event.payload.modelProfileId,
+                name: event.payload.modelProfileName
+              }
+            );
+          });
+          setSelectedConversationId(event.payload.conversationId);
+        });
+        return;
+      }
+
+      if (event.type === "chat.delta" && event.payload.delta) {
+        queueChatStreamDelta(event);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      clearChatStreamState();
+    };
+  }, [clearChatStreamState, queueChatStreamDelta]);
+
+  useEffect(() => {
     if (!selectedConversationId) {
       return;
     }
@@ -249,11 +469,15 @@ export function useScreeningWorkspace() {
 
     try {
       if (input.mode === "chat") {
+        const previousConversation = selectedConversation;
+        const previousResultsPage = resultsPage;
+        const previousConversationId = selectedConversationId;
         const optimisticConversation = createOptimisticChatConversation(
           selectedConversation,
           input.queryText
         );
 
+        clearChatStreamState();
         startTransition(() => {
           setSelectedConversation(optimisticConversation);
           setResultsPage(null);
@@ -263,20 +487,36 @@ export function useScreeningWorkspace() {
           setSelectedConversationId(null);
         }
 
-        const nextConversation = await sendChatMessage({
-          messageText: input.queryText,
-          conversationId:
-            selectedConversation?.mode === "chat" ? selectedConversation.id : undefined,
-          modelProfileId: input.modelProfileId
-        });
+        try {
+          const nextConversation = await sendChatMessage({
+            messageText: input.queryText,
+            conversationId:
+              selectedConversation?.mode === "chat" ? selectedConversation.id : undefined,
+            modelProfileId: input.modelProfileId
+          });
 
-        await loadConversationHistoryEvent();
-        startTransition(() => {
-          setSelectedConversation(nextConversation);
-          setSelectedConversationId(nextConversation.id);
-          setResultsPage(null);
-        });
-        return true;
+          const shouldAnimate = !chatStreamRef.current.hasReceivedDelta;
+          clearChatStreamState();
+          const nextConversationWithAnimation = shouldAnimate
+            ? markLatestAssistantMessageForAnimation(nextConversation)
+            : clearStreamingMessageState(nextConversation);
+
+          startTransition(() => {
+            setSelectedConversation(nextConversationWithAnimation);
+            setSelectedConversationId(nextConversationWithAnimation.id);
+            setResultsPage(null);
+          });
+          void loadConversationHistoryEvent();
+          return true;
+        } catch (error) {
+          clearChatStreamState();
+          startTransition(() => {
+            setSelectedConversation(previousConversation);
+            setSelectedConversationId(previousConversationId);
+            setResultsPage(previousResultsPage);
+          });
+          throw error;
+        }
       }
 
       const createdConversation = await createScreeningQuery(input);
@@ -286,6 +526,7 @@ export function useScreeningWorkspace() {
       setSelectedConversationId(createdConversation.id);
       return true;
     } catch (error) {
+      clearChatStreamState();
       const nextErrorMessage =
         error instanceof Error ? error.message : "Failed to submit conversation.";
       setErrorMessage(nextErrorMessage);
@@ -296,6 +537,7 @@ export function useScreeningWorkspace() {
   }
 
   function handleSelectConversation(conversationId: string) {
+    clearChatStreamState();
     setSelectedConversation(null);
     setResultsPage(null);
     setSelectedConversationId(conversationId);
@@ -303,6 +545,7 @@ export function useScreeningWorkspace() {
   }
 
   function handleStartNewChat() {
+    clearChatStreamState();
     setSelectedConversationId(null);
     setSelectedConversation(null);
     setResultsPage(null);

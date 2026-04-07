@@ -83,6 +83,18 @@ function readAnthropicStreamContent(chunks: unknown[]) {
     .trim();
 }
 
+function readAnthropicStreamDelta(chunk: unknown) {
+  const streamChunk = chunk as AnthropicStreamChunk;
+  if (
+    streamChunk.type === "content_block_delta" &&
+    streamChunk.delta?.type === "text_delta"
+  ) {
+    return streamChunk.delta.text ?? "";
+  }
+
+  return "";
+}
+
 export const anthropicProvider: ModelProvider = {
   kind: "anthropic",
   async generate(settings, request) {
@@ -107,7 +119,12 @@ export const anthropicProvider: ModelProvider = {
     await ensureOkResponse(response, "Anthropic provider");
 
     if (request.stream) {
-      const chunks = await readSseJsonChunks(response);
+      const chunks = await readSseJsonChunks(response, (chunk) => {
+        const textChunk = readAnthropicStreamDelta(chunk);
+        if (textChunk) {
+          request.onTextChunk?.(textChunk);
+        }
+      });
       const content = readAnthropicStreamContent(chunks);
       if (!content) {
         throw new Error("Anthropic provider returned an empty streaming completion.");

@@ -111,7 +111,10 @@ function parseSseBlock(block: string) {
     .trim();
 }
 
-export async function readSseJsonChunks(response: Response) {
+export async function readSseJsonChunks(
+  response: Response,
+  onChunk?: (chunk: unknown) => void
+) {
   if (!response.body) {
     throw new Error("Streaming response did not include a readable body.");
   }
@@ -142,7 +145,9 @@ export async function readSseJsonChunks(response: Response) {
       }
 
       try {
-        chunks.push(JSON.parse(data) as unknown);
+        const parsedChunk = JSON.parse(data) as unknown;
+        chunks.push(parsedChunk);
+        onChunk?.(parsedChunk);
       } catch (error) {
         throw new Error(
           `Failed to parse model streaming chunk: ${
@@ -155,13 +160,18 @@ export async function readSseJsonChunks(response: Response) {
 
   const remainingData = parseSseBlock(buffer);
   if (remainingData && remainingData !== "[DONE]") {
-    chunks.push(JSON.parse(remainingData) as unknown);
+    const parsedChunk = JSON.parse(remainingData) as unknown;
+    chunks.push(parsedChunk);
+    onChunk?.(parsedChunk);
   }
 
   return chunks;
 }
 
-export async function readNdjsonChunks(response: Response) {
+export async function readNdjsonChunks(
+  response: Response,
+  onChunk?: (chunk: unknown) => void
+) {
   if (!response.body) {
     throw new Error("Streaming response did not include a readable body.");
   }
@@ -187,13 +197,17 @@ export async function readNdjsonChunks(response: Response) {
         continue;
       }
 
-      chunks.push(JSON.parse(trimmedLine) as unknown);
+      const parsedChunk = JSON.parse(trimmedLine) as unknown;
+      chunks.push(parsedChunk);
+      onChunk?.(parsedChunk);
     }
   }
 
   const remainingLine = buffer.trim();
   if (remainingLine) {
-    chunks.push(JSON.parse(remainingLine) as unknown);
+    const parsedChunk = JSON.parse(remainingLine) as unknown;
+    chunks.push(parsedChunk);
+    onChunk?.(parsedChunk);
   }
 
   return chunks;

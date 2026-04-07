@@ -239,3 +239,7 @@ export async function createScreeningQuery(input: CreateScreeningQueryInput) {
 
   return getScreeningQuery(startEvent.payload.conversationId);
 }
+
+export function subscribeToAgentEvents(listener: (event: AgentEvent) => void) {
+  return agentClient.subscribe(listener);
+}

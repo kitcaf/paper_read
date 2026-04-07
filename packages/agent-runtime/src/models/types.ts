@@ -18,6 +18,7 @@ export interface ModelGenerateRequest {
   maxTokens?: number;
   responseFormat?: ModelResponseFormat;
   stream?: boolean;
+  onTextChunk?: (chunk: string) => void;
 }
 
 export interface ModelGenerateResponse {
