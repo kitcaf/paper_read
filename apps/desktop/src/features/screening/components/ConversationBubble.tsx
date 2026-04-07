@@ -65,8 +65,9 @@ function ConversationBubbleInner({ message }: { message: ConversationMessage }) 
 
         <div className="relative">
           <MessageMarkdown
-            animate={message.streaming ? false : message.animate}
             content={message.body}
+            animate={message.animate}
+            streaming={message.streaming}
           />
           {message.streaming ? (
             <span className="ml-1 inline-block h-5 w-0.5 animate-pulse rounded-full bg-ink-400/70 align-middle" />

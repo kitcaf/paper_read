@@ -59,7 +59,6 @@ export function ScreeningWorkspacePage() {
         sidebar={({ onToggleSidebar }) => (
           <HistorySidebar
             conversations={conversationHistory}
-            sources={sources}
             selectedConversationId={selectedConversationId}
             onSelectConversation={onSelectConversation}
             onCreateChat={onStartNewChat}

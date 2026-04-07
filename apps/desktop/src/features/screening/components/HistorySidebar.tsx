@@ -1,17 +1,13 @@
-import type { SourceSummary } from "@paper-read/shared";
 import { ChevronLeft, Plus, Settings } from "lucide-react";
 
 import {
   formatConversationTimestamp,
-  formatSourceLabel,
-  getQueryStatusVariant,
   truncateText
 } from "../presentation";
 import type { WorkspaceConversationSummary } from "../workspaceTypes";
 
 interface HistorySidebarProps {
   conversations: WorkspaceConversationSummary[];
-  sources: SourceSummary[];
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
   onCreateChat: () => void;
@@ -21,7 +17,6 @@ interface HistorySidebarProps {
 
 export function HistorySidebar({
   conversations,
-  sources,
   selectedConversationId,
   onSelectConversation,
   onCreateChat,
@@ -65,17 +60,13 @@ export function HistorySidebar({
         {conversations.length ? (
           <ul className="space-y-1">
             {conversations.map((conversation) => {
-              const statusVariant =
-                conversation.mode === "screening"
-                  ? getQueryStatusVariant(conversation.status)
-                  : null;
               const isActive = conversation.id === selectedConversationId;
 
               return (
                 <li key={conversation.id}>
                   <button
                     className={[
-                      "w-full rounded-[14px] border px-3 py-3 text-left transition duration-200",
+                      "w-full rounded-[14px] border px-3 py-2.5 text-left transition duration-200",
                       isActive
                         ? "border-ink-300/55 bg-white shadow-[0_8px_24px_rgba(24,37,47,0.06)]"
                         : "border-transparent bg-transparent hover:border-white/70 hover:bg-white/72"
@@ -83,21 +74,11 @@ export function HistorySidebar({
                     type="button"
                     onClick={() => onSelectConversation(conversation.id)}
                   >
-                    <p className="truncate text-sm font-medium text-ink-900">
-                      {truncateText(conversation.title, 28)}
+                    <p className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-ink-400">
+                      {formatConversationTimestamp(conversation.updatedAt || conversation.createdAt)}
                     </p>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="truncate text-xs text-ink-500">
-                        {conversation.mode === "screening" && conversation.sourceKey
-                          ? formatSourceLabel(conversation.sourceKey, sources)
-                          : "自由聊天"}
-                      </span>
-                      {statusVariant ? (
-                        <span className={statusVariant.badgeClassName}>{conversation.status}</span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-xs text-ink-400">
-                      {formatConversationTimestamp(conversation.createdAt)}
+                    <p className="mt-1 line-clamp-2 text-sm font-medium leading-6 text-ink-900">
+                      {truncateText(conversation.title, 40)}
                     </p>
                   </button>
                 </li>
