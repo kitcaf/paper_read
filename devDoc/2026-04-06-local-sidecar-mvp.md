@@ -13,3 +13,4 @@
 - 删除本地规则 provider 与规则筛选 fallback；默认模型配置改为 OpenAI Compatible，需要用户配置真实 LLM API。
 - 修复桌面 App 外层页面与内部面板同时滚动导致的双滚动条问题。
 - 模型 API 测试错误增加脱敏和短消息处理，设置弹窗增强内部滚动约束，避免长错误撑破布局。
+- 设置中心和对话中的模型选择器切换到 shadcn 风格的 Button / Input / Select 组件，并统一到 `global.css` 配色 token。

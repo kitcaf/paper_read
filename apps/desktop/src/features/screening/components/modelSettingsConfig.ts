@@ -75,10 +75,6 @@ export function getProviderOption(provider: ModelProviderKind) {
   );
 }
 
-export function getInputClassName() {
-  return "h-11 w-full rounded-2xl border border-ink-300/45 bg-white/85 px-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-700/60";
-}
-
 export function readDraftNumber(value: string, fallback: string) {
   if (!value.trim()) {
     return Number(fallback);

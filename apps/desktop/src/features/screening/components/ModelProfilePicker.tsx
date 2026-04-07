@@ -32,8 +32,20 @@ export function ModelProfilePicker({
 
   return (
     <Select value={selectedProfile.id} onValueChange={onSelectProfile}>
-      <SelectTrigger className="h-10 max-w-[260px] rounded-full bg-paper-50 px-3 text-xs font-medium">
-        <SelectValue placeholder="选择模型配置" />
+      <SelectTrigger className="h-11 max-w-[320px] rounded-full border-ink-300/35 bg-white/90 px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="rounded-full bg-paper-50 px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-500">
+            LLM
+          </span>
+          <div className="min-w-0 text-left">
+            <p className="truncate text-xs font-semibold text-ink-900">{selectedProfile.name}</p>
+            <p className="truncate text-[0.68rem] text-ink-500">
+              {getProviderOption(selectedProfile.settings.provider).label} ·{" "}
+              {selectedProfile.settings.modelName}
+            </p>
+          </div>
+        </div>
+        <SelectValue className="sr-only" placeholder="选择模型配置" />
       </SelectTrigger>
       <SelectContent>
         {profiles.map((profile) => {

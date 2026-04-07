@@ -39,7 +39,7 @@ export function ModelConnectionStatus({ isTesting, result }: ModelConnectionStat
         <CircleAlert className="mt-0.5 h-4 w-4" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="max-h-28 overflow-y-auto whitespace-pre-wrap break-words font-medium leading-6 [overflow-wrap:anywhere]">
+        <p className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words font-medium leading-6 [overflow-wrap:anywhere]">
           {result.message}
         </p>
         <p className="mt-1 truncate text-xs opacity-80">

@@ -117,7 +117,7 @@ export function QueryComposer({
           </div>
 
           <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-2">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <button
                 className={[
                   "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition",

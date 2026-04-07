@@ -143,26 +143,23 @@ export function ModelSettingsDialog({
               设置
             </h2>
           </div>
-          <button
+          <Button
             aria-label="Close settings"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink-300/40 bg-white/75 text-ink-600 transition hover:border-ink-300/65 hover:bg-white hover:text-ink-900"
-            type="button"
+            size="icon"
+            variant="secondary"
             onClick={onClose}
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <nav className="mt-6">
-          <button
-            className="flex w-full items-center justify-between rounded-2xl bg-white px-3 py-3 text-left text-sm font-medium text-ink-900 shadow-[0_10px_24px_rgba(24,37,47,0.06)]"
-            type="button"
-          >
+          <div className="flex w-full items-center justify-between rounded-2xl border border-ink-300/30 bg-white px-3 py-3 text-left text-sm font-medium text-ink-900 shadow-[0_10px_24px_rgba(24,37,47,0.06)]">
             <span>LLM</span>
             <span className="rounded-full bg-ink-900 px-2 py-0.5 text-[0.68rem] text-paper-50">
               {profiles.length}
             </span>
-          </button>
+          </div>
         </nav>
       </aside>
 
