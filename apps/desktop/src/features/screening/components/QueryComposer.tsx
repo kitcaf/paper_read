@@ -117,7 +117,7 @@ export function QueryComposer({
           </div>
 
           <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
               <button
                 className={[
                   "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition",
@@ -132,7 +132,7 @@ export function QueryComposer({
                 <span>筛选论文</span>
               </button>
 
-              <div className="hidden items-center gap-2 rounded-full border border-transparent px-2 text-xs text-ink-400 md:inline-flex">
+              <div className="hidden shrink-0 items-center gap-2 rounded-full border border-transparent px-1.5 text-xs text-ink-400 lg:inline-flex">
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>Research mode</span>
               </div>

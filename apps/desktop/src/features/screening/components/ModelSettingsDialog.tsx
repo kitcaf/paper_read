@@ -132,11 +132,11 @@ export function ModelSettingsDialog({
   return (
     <ModalRoot
       ariaLabelledBy="settings-title"
-      className="relative grid h-[min(780px,calc(100vh-48px))] w-[min(1060px,calc(100vw-48px))] min-w-0 overflow-hidden rounded-[28px] border border-white/75 bg-paper-50/96 shadow-[0_24px_80px_rgba(24,37,47,0.18)] backdrop-blur-2xl md:grid-cols-[200px_minmax(0,1fr)]"
+      className="relative grid h-[min(780px,calc(100vh-48px))] w-[min(1180px,calc(100vw-36px))] min-w-0 overflow-hidden rounded-[28px] border border-white/75 bg-paper-50/96 shadow-[0_24px_80px_rgba(24,37,47,0.18)] backdrop-blur-2xl md:grid-cols-[168px_minmax(0,1fr)]"
       open={open}
       onClose={onClose}
     >
-      <aside className="min-w-0 border-b border-ink-300/30 bg-paper-50/92 p-4 md:border-b-0 md:border-r">
+      <aside className="min-w-0 border-b border-ink-300/30 bg-paper-50/92 p-3.5 md:border-b-0 md:border-r">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="settings-title" className="text-lg font-semibold text-ink-900">
@@ -153,7 +153,7 @@ export function ModelSettingsDialog({
           </Button>
         </div>
 
-        <nav className="mt-6">
+        <nav className="mt-5">
           <div className="flex w-full items-center justify-between rounded-2xl border border-ink-300/30 bg-white px-3 py-3 text-left text-sm font-medium text-ink-900 shadow-[0_10px_24px_rgba(24,37,47,0.06)]">
             <span>LLM</span>
             <span className="rounded-full bg-ink-900 px-2 py-0.5 text-[0.68rem] text-paper-50">
@@ -163,7 +163,7 @@ export function ModelSettingsDialog({
         </nav>
       </aside>
 
-      <section className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
+      <section className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-xl font-semibold text-ink-900">LLM API</h3>
@@ -183,7 +183,7 @@ export function ModelSettingsDialog({
           </div>
         ) : null}
 
-        <div className="mt-5 grid min-w-0 gap-4 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
+        <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(220px,248px)_minmax(0,1fr)]">
           <ModelProfileList
             profiles={profiles}
             selectedProfileId={selectedProfileId}

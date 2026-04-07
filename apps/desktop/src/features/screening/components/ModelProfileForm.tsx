@@ -104,7 +104,7 @@ export function ModelProfileForm({
   const isBusy = isSaving || isTesting;
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-[28px] border border-ink-300/35 bg-white/84 p-4 shadow-[0_14px_36px_rgba(24,37,47,0.06)]">
+    <div className="min-w-0 overflow-hidden rounded-[28px] border border-ink-300/35 bg-white/84 p-5 shadow-[0_14px_36px_rgba(24,37,47,0.06)]">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-300/30 pb-4">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-ink-900">
@@ -127,13 +127,13 @@ export function ModelProfileForm({
         </div>
       </div>
 
-      <div className="mt-4 grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <div className="mt-5 grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <Section
           description="为这个模型配置命名，并指定 provider、模型名称和请求入口。"
           icon={Settings2}
           title="基础配置"
         >
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
             <Field label="配置名称">
               <Input
                 value={draft.name}

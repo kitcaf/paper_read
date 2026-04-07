@@ -46,7 +46,7 @@ export function ModelProfileList({
             <button
               key={profile.id}
               className={[
-                "w-full min-w-0 rounded-2xl border px-4 py-3 text-left transition",
+                "w-full min-w-0 rounded-[20px] border px-3.5 py-3 text-left transition",
                 isSelected
                   ? "border-ink-900/20 bg-white shadow-[0_12px_28px_rgba(24,37,47,0.08)]"
                   : "border-ink-300/35 bg-white/65 hover:border-ink-300/55 hover:bg-white"
