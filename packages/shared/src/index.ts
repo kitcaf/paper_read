@@ -217,7 +217,15 @@ export type AgentCommand =
     >
   | AgentCommandWithPayload<
       "chat.start",
-      { conversationId?: string; messageText: string; modelProfileId?: string }
+      {
+        sessionId?: string;
+        turnId: string;
+        runId: string;
+        userMessageClientId: string;
+        assistantMessageClientId: string;
+        messageText: string;
+        modelProfileId?: string;
+      }
     >
   | AgentCommandWithPayload<
       "screening.start",
@@ -275,6 +283,7 @@ export interface LocalConversationSummary {
 
 export interface LocalMessageRecord {
   id: string;
+  clientMessageId: string;
   conversationId: string;
   role: "user" | "assistant" | "tool";
   content: string;
@@ -329,7 +338,10 @@ export type AgentEvent =
   | AgentEventBase<
       "chat.started",
       {
-        conversationId: string;
+        sessionId: string;
+        turnId: string;
+        runId: string;
+        assistantMessageClientId: string;
         modelProfileId?: string;
         modelProfileName?: string;
       }
@@ -337,14 +349,21 @@ export type AgentEvent =
   | AgentEventBase<
       "chat.delta",
       {
-        conversationId: string;
+        sessionId: string;
+        turnId: string;
+        runId: string;
+        assistantMessageClientId: string;
+        seq: number;
         delta: string;
       }
     >
   | AgentEventBase<
       "chat.completed",
       {
-        conversationId: string;
+        sessionId: string;
+        turnId: string;
+        runId: string;
+        assistantMessageClientId: string;
         messageId: string;
       }
     >

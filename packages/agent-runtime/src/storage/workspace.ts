@@ -112,6 +112,23 @@ function migrateWorkspaceSchema(db: Database) {
     }
   }
 
+  try {
+    db.exec("ALTER TABLE messages ADD COLUMN client_message_id TEXT;");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.toLowerCase().includes("duplicate column")) {
+      throw error;
+    }
+  }
+
+  db.query(
+    "UPDATE messages SET client_message_id = id WHERE client_message_id IS NULL OR client_message_id = ''"
+  ).run();
+
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_message_id ON messages(client_message_id);"
+  );
+
   db.query(`
     UPDATE model_profiles
     SET
@@ -517,10 +534,15 @@ export function setDefaultModelProfile(db: Database, profileId: string) {
 
 export function createConversation(
   db: Database,
-  input: { title: string; mode: "chat" | "screening"; metadata?: Record<string, unknown> }
+  input: {
+    id?: string;
+    title: string;
+    mode: "chat" | "screening";
+    metadata?: Record<string, unknown>;
+  }
 ) {
   const timestamp = nowIso();
-  const conversationId = crypto.randomUUID();
+  const conversationId = input.id ?? crypto.randomUUID();
 
   db.query(
     `
@@ -554,21 +576,25 @@ export function updateConversationMetadata(
 export function createMessage(
   db: Database,
   input: {
+    id?: string;
+    clientMessageId?: string;
     conversationId: string;
     role: "user" | "assistant" | "tool";
     content: string;
     metadata?: Record<string, unknown>;
   }
 ) {
-  const messageId = crypto.randomUUID();
+  const messageId = input.id ?? crypto.randomUUID();
+  const clientMessageId = input.clientMessageId ?? messageId;
 
   db.query(
     `
-    INSERT INTO messages (id, conversation_id, role, content, metadata_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, client_message_id, conversation_id, role, content, metadata_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     `
   ).run(
     messageId,
+    clientMessageId,
     input.conversationId,
     input.role,
     input.content,
@@ -651,6 +677,7 @@ export function listMessages(db: Database, conversationId: string): LocalMessage
     .query<
       {
         id: string;
+        client_message_id: string;
         conversation_id: string;
         role: "user" | "assistant" | "tool";
         content: string;
@@ -660,7 +687,7 @@ export function listMessages(db: Database, conversationId: string): LocalMessage
       [string]
     >(
       `
-      SELECT id, conversation_id, role, content, metadata_json, created_at
+      SELECT id, client_message_id, conversation_id, role, content, metadata_json, created_at
       FROM messages
       WHERE conversation_id = ?
       ORDER BY created_at ASC
@@ -669,6 +696,7 @@ export function listMessages(db: Database, conversationId: string): LocalMessage
     .all(conversationId)
     .map((row) => ({
       id: row.id,
+      clientMessageId: row.client_message_id,
       conversationId: row.conversation_id,
       role: row.role,
       content: row.content,

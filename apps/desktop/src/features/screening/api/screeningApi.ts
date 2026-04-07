@@ -35,7 +35,11 @@ interface CreateScreeningQueryInput {
 
 interface SendChatMessageInput {
   messageText: string;
-  conversationId?: string;
+  sessionId?: string;
+  turnId: string;
+  runId: string;
+  userMessageClientId: string;
+  assistantMessageClientId: string;
   modelProfileId?: string;
 }
 
@@ -193,7 +197,11 @@ export async function sendChatMessage(input: SendChatMessageInput): Promise<Work
       {
         type: "chat.start",
         payload: {
-          conversationId: input.conversationId,
+          sessionId: input.sessionId,
+          turnId: input.turnId,
+          runId: input.runId,
+          userMessageClientId: input.userMessageClientId,
+          assistantMessageClientId: input.assistantMessageClientId,
           messageText: input.messageText,
           modelProfileId: input.modelProfileId
         }

@@ -273,8 +273,8 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
   const { db } = getWorkspaceStorage();
   const selectedModelProfile = getModelProfileSettings(db, command.payload.modelProfileId);
   const modelRuntime = createModelRuntime(selectedModelProfile.settings);
-  const existingConversation = command.payload.conversationId
-    ? listConversations(db).find((item) => item.id === command.payload.conversationId) ?? null
+  const existingConversation = command.payload.sessionId
+    ? listConversations(db).find((item) => item.id === command.payload.sessionId) ?? null
     : null;
 
   if (existingConversation && existingConversation.mode !== "chat") {
@@ -284,21 +284,29 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
   const conversationId =
     existingConversation?.id ??
     createConversation(db, {
+      id: command.payload.sessionId,
       title: command.payload.messageText.slice(0, 80),
       mode: "chat",
       metadata: {
         lastUserMessage: command.payload.messageText,
         status: "running",
+        turnId: command.payload.turnId,
+        runId: command.payload.runId,
         modelProfileId: selectedModelProfile.profile.id,
         modelProfileName: selectedModelProfile.profile.name
       }
     });
 
-  const userMessageId = createMessage(db, {
+  createMessage(db, {
+    clientMessageId: command.payload.userMessageClientId,
     conversationId,
     role: "user",
     content: command.payload.messageText,
     metadata: {
+      sessionId: conversationId,
+      turnId: command.payload.turnId,
+      runId: command.payload.runId,
+      clientMessageId: command.payload.userMessageClientId,
       modelProfileId: selectedModelProfile.profile.id,
       modelProfileName: selectedModelProfile.profile.name
     }
@@ -307,6 +315,8 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
   updateConversationMetadata(db, conversationId, {
     lastUserMessage: command.payload.messageText,
     status: "running",
+    turnId: command.payload.turnId,
+    runId: command.payload.runId,
     modelProfileId: selectedModelProfile.profile.id,
     modelProfileName: selectedModelProfile.profile.name,
     modelName: modelRuntime.settings.modelName,
@@ -330,30 +340,44 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
     id: command.id,
     type: "chat.started",
     payload: {
-      conversationId,
+      sessionId: conversationId,
+      turnId: command.payload.turnId,
+      runId: command.payload.runId,
+      assistantMessageClientId: command.payload.assistantMessageClientId,
       modelProfileId: selectedModelProfile.profile.id,
       modelProfileName: selectedModelProfile.profile.name
     }
   });
 
   try {
+    let chunkSequence = 0;
     const reply = await generateChatReply(modelRuntime, listMessages(db, conversationId), {
       onTextChunk: (chunk) => {
         emit({
           id: command.id,
           type: "chat.delta",
           payload: {
-            conversationId,
+            sessionId: conversationId,
+            turnId: command.payload.turnId,
+            runId: command.payload.runId,
+            assistantMessageClientId: command.payload.assistantMessageClientId,
+            seq: chunkSequence,
             delta: chunk
           }
         });
+        chunkSequence += 1;
       }
     });
     const assistantMessageId = createMessage(db, {
+      clientMessageId: command.payload.assistantMessageClientId,
       conversationId,
       role: "assistant",
       content: reply.content,
       metadata: {
+        sessionId: conversationId,
+        turnId: command.payload.turnId,
+        runId: command.payload.runId,
+        clientMessageId: command.payload.assistantMessageClientId,
         provider: reply.metadata.provider,
         modelName: reply.metadata.modelName,
         modelProfileId: selectedModelProfile.profile.id,
@@ -369,7 +393,10 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
       id: command.id,
       type: "chat.completed",
       payload: {
-        conversationId,
+        sessionId: conversationId,
+        turnId: command.payload.turnId,
+        runId: command.payload.runId,
+        assistantMessageClientId: command.payload.assistantMessageClientId,
         messageId: assistantMessageId
       }
     });
@@ -379,6 +406,8 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
       lastAssistantMessage: reply.content,
       status: "completed",
       lastError: null,
+      turnId: command.payload.turnId,
+      runId: command.payload.runId,
       modelProvider: modelRuntime.provider.kind,
       modelProfileId: selectedModelProfile.profile.id,
       modelProfileName: selectedModelProfile.profile.name,
@@ -389,6 +418,8 @@ async function handleChatStart(command: Extract<AgentCommand, { type: "chat.star
       lastUserMessage: command.payload.messageText,
       status: "failed",
       lastError: error instanceof Error ? error.message : "Chat generation failed.",
+      turnId: command.payload.turnId,
+      runId: command.payload.runId,
       modelProvider: modelRuntime.provider.kind,
       modelProfileId: selectedModelProfile.profile.id,
       modelProfileName: selectedModelProfile.profile.name,

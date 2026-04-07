@@ -63,7 +63,7 @@ function buildProgressMessage(
 function mapLocalMessageToConversationMessage(message: LocalMessageRecord): ConversationMessage | null {
   if (message.role === "user") {
     return {
-      id: message.id,
+      id: message.clientMessageId,
       role: "user",
       body: message.content
     };
@@ -71,7 +71,7 @@ function mapLocalMessageToConversationMessage(message: LocalMessageRecord): Conv
 
   if (message.role === "assistant") {
     return {
-      id: message.id,
+      id: message.clientMessageId,
       role: "assistant",
       body: message.content,
       variant: "default",
@@ -89,13 +89,13 @@ function mapLocalMessageToConversationMessage(message: LocalMessageRecord): Conv
         : "tool";
 
   return {
-    id: message.id,
+    id: message.clientMessageId,
     role: "assistant",
     title: "工具执行",
     body: message.content,
     chips: [
       {
-        id: `${message.id}:tool`,
+        id: `${message.clientMessageId}:tool`,
         label: toolLabel
       }
     ],

@@ -37,79 +37,121 @@ interface SubmitScreeningInput {
 
 type SubmitConversationInput = SubmitChatInput | SubmitScreeningInput;
 
+interface ChatStreamState {
+  sessionId: string | null;
+  runId: string | null;
+  assistantMessageClientId: string | null;
+  bufferedDelta: string;
+  hasReceivedDelta: boolean;
+  frameId: number | null;
+  lastSeq: number;
+}
+
 const ACTIVE_QUERY_STATUSES = new Set(["queued", "running"]);
 const POLLING_INTERVAL_MS = 2500;
+const CHAT_SESSION_PREFIX = "session";
+const CHAT_TURN_PREFIX = "turn";
+const CHAT_RUN_PREFIX = "run";
+const CHAT_USER_MESSAGE_PREFIX = "msg-user";
+const CHAT_ASSISTANT_MESSAGE_PREFIX = "msg-assistant";
 
 function nowIso() {
   return new Date().toISOString();
 }
 
-function createOptimisticChatMessages(
-  conversationId: string,
-  existingMessages: LocalMessageRecord[],
-  queryText: string
-) {
+function createPrefixedId(prefix: string) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function createOptimisticChatMessages(input: {
+  conversationId: string;
+  existingMessages: LocalMessageRecord[];
+  queryText: string;
+  turnId: string;
+  runId: string;
+  userMessageClientId: string;
+  assistantMessageClientId: string;
+  modelProfileId?: string;
+}) {
   const userTimestamp = nowIso();
   const assistantTimestamp = new Date(Date.now() + 1).toISOString();
 
   return [
-    ...existingMessages,
+    ...input.existingMessages,
     {
-      id: `temp-user-${crypto.randomUUID()}`,
-      conversationId,
+      id: input.userMessageClientId,
+      clientMessageId: input.userMessageClientId,
+      conversationId: input.conversationId,
       role: "user" as const,
-      content: queryText,
+      content: input.queryText,
       metadata: {
-        optimistic: true
+        optimistic: true,
+        turnId: input.turnId,
+        runId: input.runId,
+        clientMessageId: input.userMessageClientId,
+        ...(input.modelProfileId ? { modelProfileId: input.modelProfileId } : {})
       },
       createdAt: userTimestamp
     },
     {
-      id: `temp-assistant-${crypto.randomUUID()}`,
-      conversationId,
+      id: input.assistantMessageClientId,
+      clientMessageId: input.assistantMessageClientId,
+      conversationId: input.conversationId,
       role: "assistant" as const,
       content: "",
       metadata: {
         pending: true,
-        optimistic: true
+        optimistic: true,
+        streaming: true,
+        turnId: input.turnId,
+        runId: input.runId,
+        clientMessageId: input.assistantMessageClientId,
+        ...(input.modelProfileId ? { modelProfileId: input.modelProfileId } : {})
       },
       createdAt: assistantTimestamp
     }
   ];
 }
 
-function createOptimisticChatConversation(
-  currentConversation: WorkspaceConversationDetail | null,
-  queryText: string
-): WorkspaceConversationDetail {
-  const conversationId =
-    currentConversation?.mode === "chat"
-      ? currentConversation.id
-      : `temp-chat-${crypto.randomUUID()}`;
-  const createdAt =
-    currentConversation?.mode === "chat" ? currentConversation.createdAt : nowIso();
+function createOptimisticChatConversation(input: {
+  currentConversation: WorkspaceConversationDetail | null;
+  sessionId: string;
+  queryText: string;
+  turnId: string;
+  runId: string;
+  userMessageClientId: string;
+  assistantMessageClientId: string;
+  modelProfileId?: string;
+}): WorkspaceConversationDetail {
+  const createdAt = input.currentConversation?.mode === "chat" ? input.currentConversation.createdAt : nowIso();
   const updatedAt = nowIso();
 
   return {
-    id: conversationId,
+    id: input.sessionId,
     title:
-      currentConversation?.mode === "chat"
-        ? currentConversation.title
-        : queryText.slice(0, 80) || "新对话",
-    preview: queryText,
+      input.currentConversation?.mode === "chat"
+        ? input.currentConversation.title
+        : input.queryText.slice(0, 80) || "新对话",
+    preview: input.queryText,
     mode: "chat",
     sourceLabel: "自由聊天",
     status: "running",
-    modelProfileId: currentConversation?.modelProfileId,
-    modelProfileName: currentConversation?.modelProfileName,
+    modelProfileId: input.modelProfileId ?? input.currentConversation?.modelProfileId,
+    modelProfileName: input.currentConversation?.modelProfileName,
     createdAt,
     updatedAt,
-    queryText,
-    messages: createOptimisticChatMessages(
-      conversationId,
-      currentConversation?.mode === "chat" ? currentConversation.messages : [],
-      queryText
-    ),
+    queryText: input.queryText,
+    messages: createOptimisticChatMessages({
+      conversationId: input.sessionId,
+      existingMessages:
+        input.currentConversation?.mode === "chat" ? input.currentConversation.messages : [],
+      queryText: input.queryText,
+      turnId: input.turnId,
+      runId: input.runId,
+      userMessageClientId: input.userMessageClientId,
+      assistantMessageClientId: input.assistantMessageClientId,
+      modelProfileId: input.modelProfileId
+    }),
     options: {},
     intentSummary: null,
     intentJson: null,
@@ -122,86 +164,112 @@ function createOptimisticChatConversation(
   };
 }
 
-function updateLatestAssistantMessage(
+function updateMessageByClientId(
   messages: LocalMessageRecord[],
+  clientMessageId: string,
   updater: (message: LocalMessageRecord) => LocalMessageRecord
 ) {
-  const targetIndex = [...messages]
-    .map((message) => message.role)
-    .lastIndexOf("assistant");
+  let hasUpdated = false;
 
-  if (targetIndex < 0) {
-    return messages;
-  }
+  const nextMessages = messages.map((message) => {
+    if (message.clientMessageId !== clientMessageId) {
+      return message;
+    }
 
-  return messages.map((message, index) =>
-    index === targetIndex ? updater(message) : message
-  );
+    hasUpdated = true;
+    return updater(message);
+  });
+
+  return hasUpdated ? nextMessages : messages;
 }
 
-function markLatestAssistantMessageForAnimation(
-  conversation: WorkspaceConversationDetail
-): WorkspaceConversationDetail {
-  const latestAssistantIndex = [...conversation.messages]
-    .map((message) => message.role)
-    .lastIndexOf("assistant");
+function mergeMessageRecords(
+  currentMessages: LocalMessageRecord[],
+  incomingMessages: LocalMessageRecord[]
+) {
+  const mergedMessages = new Map<string, LocalMessageRecord>();
+  const orderedClientMessageIds: string[] = [];
+  const knownClientMessageIds = new Set<string>();
 
-  if (latestAssistantIndex < 0) {
-    return conversation;
-  }
+  const upsertMessage = (message: LocalMessageRecord) => {
+    const existingMessage = mergedMessages.get(message.clientMessageId);
 
-  return {
-    ...conversation,
-    messages: conversation.messages.map((message, index) =>
-      index === latestAssistantIndex
+    if (!knownClientMessageIds.has(message.clientMessageId)) {
+      knownClientMessageIds.add(message.clientMessageId);
+      orderedClientMessageIds.push(message.clientMessageId);
+    }
+
+    mergedMessages.set(
+      message.clientMessageId,
+      existingMessage
         ? {
+            ...existingMessage,
             ...message,
             metadata: {
-              ...message.metadata,
-              clientAnimate: true,
-              pending: false,
-              streaming: false
+              ...existingMessage.metadata,
+              ...message.metadata
             }
           }
         : message
-    )
+    );
+  };
+
+  currentMessages.forEach(upsertMessage);
+  incomingMessages.forEach(upsertMessage);
+
+  return orderedClientMessageIds
+    .map((clientMessageId) => mergedMessages.get(clientMessageId))
+    .filter((message): message is LocalMessageRecord => Boolean(message));
+}
+
+function mergeConversationDetails(
+  currentConversation: WorkspaceConversationDetail | null,
+  incomingConversation: WorkspaceConversationDetail
+) {
+  if (!currentConversation) {
+    return incomingConversation;
+  }
+
+  if (currentConversation.id !== incomingConversation.id) {
+    return incomingConversation;
+  }
+
+  return {
+    ...currentConversation,
+    ...incomingConversation,
+    messages: mergeMessageRecords(currentConversation.messages, incomingConversation.messages)
   };
 }
 
-function attachStreamingConversationId(
+function markAssistantMessageForAnimation(
   conversation: WorkspaceConversationDetail,
-  conversationId: string,
-  profile?: { id?: string; name?: string }
+  clientMessageId: string
 ): WorkspaceConversationDetail {
   return {
     ...conversation,
-    id: conversationId,
-    status: "running",
-    modelProfileId: profile?.id ?? conversation.modelProfileId,
-    modelProfileName: profile?.name ?? conversation.modelProfileName,
-    messages: conversation.messages.map((message) =>
-      message.conversationId === conversationId
-        ? message
-        : {
-            ...message,
-            conversationId
-          }
-    )
+    messages: updateMessageByClientId(conversation.messages, clientMessageId, (message) => ({
+      ...message,
+      id: message.id,
+      metadata: {
+        ...message.metadata,
+        clientAnimate: true,
+        pending: false,
+        streaming: false
+      }
+    }))
   };
 }
 
 function appendStreamingAssistantDelta(
   conversation: WorkspaceConversationDetail,
-  conversationId: string,
+  clientMessageId: string,
   delta: string
 ): WorkspaceConversationDetail {
   return {
     ...conversation,
-    id: conversationId,
     status: "running",
-    messages: updateLatestAssistantMessage(conversation.messages, (message) => ({
+    messages: updateMessageByClientId(conversation.messages, clientMessageId, (message) => ({
       ...message,
-      conversationId,
       content: `${message.content}${delta}`,
       metadata: {
         ...message.metadata,
@@ -215,18 +283,47 @@ function appendStreamingAssistantDelta(
 }
 
 function clearStreamingMessageState(
-  conversation: WorkspaceConversationDetail
+  conversation: WorkspaceConversationDetail,
+  clientMessageId: string
 ): WorkspaceConversationDetail {
   return {
     ...conversation,
-    messages: updateLatestAssistantMessage(conversation.messages, (message) => ({
+    messages: updateMessageByClientId(conversation.messages, clientMessageId, (message) => ({
       ...message,
       metadata: {
         ...message.metadata,
         pending: false,
-        streaming: false
+        streaming: false,
+        optimistic: false
       }
     }))
+  };
+}
+
+function syncStreamingConversationStart(
+  conversation: WorkspaceConversationDetail,
+  payload: Extract<AgentEvent, { type: "chat.started" }>["payload"]
+): WorkspaceConversationDetail {
+  return {
+    ...conversation,
+    id: payload.sessionId,
+    status: "running",
+    modelProfileId: payload.modelProfileId ?? conversation.modelProfileId,
+    modelProfileName: payload.modelProfileName ?? conversation.modelProfileName,
+    messages: updateMessageByClientId(
+      conversation.messages,
+      payload.assistantMessageClientId,
+      (message) => ({
+        ...message,
+        conversationId: payload.sessionId,
+        metadata: {
+          ...message.metadata,
+          pending: true,
+          streaming: true,
+          optimistic: false
+        }
+      })
+    )
   };
 }
 
@@ -243,16 +340,14 @@ export function useScreeningWorkspace() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [composerResetKey, setComposerResetKey] = useState(0);
   const [isPending, startTransition] = useTransition();
-  const chatStreamRef = useRef<{
-    conversationId: string | null;
-    bufferedDelta: string;
-    hasReceivedDelta: boolean;
-    frameId: number | null;
-  }>({
-    conversationId: null,
+  const chatStreamRef = useRef<ChatStreamState>({
+    sessionId: null,
+    runId: null,
+    assistantMessageClientId: null,
     bufferedDelta: "",
     hasReceivedDelta: false,
-    frameId: null
+    frameId: null,
+    lastSeq: -1
   });
 
   const clearChatStreamState = useEffectEvent(() => {
@@ -261,10 +356,13 @@ export function useScreeningWorkspace() {
     }
 
     chatStreamRef.current = {
-      conversationId: null,
+      sessionId: null,
+      runId: null,
+      assistantMessageClientId: null,
       bufferedDelta: "",
       hasReceivedDelta: false,
-      frameId: null
+      frameId: null,
+      lastSeq: -1
     };
   });
 
@@ -278,10 +376,10 @@ export function useScreeningWorkspace() {
   });
 
   const flushChatStreamDelta = useEffectEvent(() => {
-    const { conversationId, bufferedDelta } = chatStreamRef.current;
+    const { assistantMessageClientId, bufferedDelta, sessionId } = chatStreamRef.current;
     chatStreamRef.current.frameId = null;
 
-    if (!conversationId || !bufferedDelta) {
+    if (!sessionId || !assistantMessageClientId || !bufferedDelta) {
       chatStreamRef.current.bufferedDelta = "";
       return;
     }
@@ -293,16 +391,13 @@ export function useScreeningWorkspace() {
           return currentConversation;
         }
 
-        if (
-          currentConversation.id !== conversationId &&
-          !currentConversation.id.startsWith("temp-chat-")
-        ) {
+        if (currentConversation.id !== sessionId) {
           return currentConversation;
         }
 
         return appendStreamingAssistantDelta(
           currentConversation,
-          conversationId,
+          assistantMessageClientId,
           bufferedDelta
         );
       });
@@ -311,7 +406,20 @@ export function useScreeningWorkspace() {
 
   const queueChatStreamDelta = useEffectEvent(
     (event: Extract<AgentEvent, { type: "chat.delta" }>) => {
-      chatStreamRef.current.conversationId = event.payload.conversationId;
+      if (
+        chatStreamRef.current.sessionId !== event.payload.sessionId ||
+        chatStreamRef.current.runId !== event.payload.runId ||
+        chatStreamRef.current.assistantMessageClientId !==
+          event.payload.assistantMessageClientId
+      ) {
+        return;
+      }
+
+      if (event.payload.seq <= chatStreamRef.current.lastSeq) {
+        return;
+      }
+
+      chatStreamRef.current.lastSeq = event.payload.seq;
       chatStreamRef.current.bufferedDelta += event.payload.delta;
       chatStreamRef.current.hasReceivedDelta = true;
 
@@ -339,7 +447,9 @@ export function useScreeningWorkspace() {
             : null;
 
         startTransition(() => {
-          setSelectedConversation(conversationDetail);
+          setSelectedConversation((currentConversation) =>
+            mergeConversationDetails(currentConversation, conversationDetail)
+          );
           setResultsPage(conversationResults);
         });
       } catch (error) {
@@ -400,9 +510,13 @@ export function useScreeningWorkspace() {
   useEffect(() => {
     const unsubscribe = subscribeToAgentEvents((event) => {
       if (event.type === "chat.started") {
-        chatStreamRef.current.conversationId = event.payload.conversationId;
+        chatStreamRef.current.sessionId = event.payload.sessionId;
+        chatStreamRef.current.runId = event.payload.runId;
+        chatStreamRef.current.assistantMessageClientId =
+          event.payload.assistantMessageClientId;
         chatStreamRef.current.bufferedDelta = "";
         chatStreamRef.current.hasReceivedDelta = false;
+        chatStreamRef.current.lastSeq = -1;
 
         startTransition(() => {
           setSelectedConversation((currentConversation) => {
@@ -410,16 +524,13 @@ export function useScreeningWorkspace() {
               return currentConversation;
             }
 
-            return attachStreamingConversationId(
-              currentConversation,
-              event.payload.conversationId,
-              {
-                id: event.payload.modelProfileId,
-                name: event.payload.modelProfileName
-              }
-            );
+            if (currentConversation.id !== event.payload.sessionId) {
+              return currentConversation;
+            }
+
+            return syncStreamingConversationStart(currentConversation, event.payload);
           });
-          setSelectedConversationId(event.payload.conversationId);
+          setSelectedConversationId(event.payload.sessionId);
         });
         return;
       }
@@ -437,6 +548,10 @@ export function useScreeningWorkspace() {
 
   useEffect(() => {
     if (!selectedConversationId) {
+      return;
+    }
+
+    if (chatStreamRef.current.sessionId === selectedConversationId) {
       return;
     }
 
@@ -472,38 +587,78 @@ export function useScreeningWorkspace() {
         const previousConversation = selectedConversation;
         const previousResultsPage = resultsPage;
         const previousConversationId = selectedConversationId;
-        const optimisticConversation = createOptimisticChatConversation(
-          selectedConversation,
-          input.queryText
-        );
+        const sessionId =
+          selectedConversation?.mode === "chat"
+            ? selectedConversation.id
+            : createPrefixedId(CHAT_SESSION_PREFIX);
+        const turnId = createPrefixedId(CHAT_TURN_PREFIX);
+        const runId = createPrefixedId(CHAT_RUN_PREFIX);
+        const userMessageClientId = createPrefixedId(CHAT_USER_MESSAGE_PREFIX);
+        const assistantMessageClientId = createPrefixedId(CHAT_ASSISTANT_MESSAGE_PREFIX);
+        const optimisticConversation = createOptimisticChatConversation({
+          currentConversation: selectedConversation?.mode === "chat" ? selectedConversation : null,
+          sessionId,
+          queryText: input.queryText,
+          turnId,
+          runId,
+          userMessageClientId,
+          assistantMessageClientId,
+          modelProfileId: input.modelProfileId
+        });
 
         clearChatStreamState();
+        chatStreamRef.current = {
+          sessionId,
+          runId,
+          assistantMessageClientId,
+          bufferedDelta: "",
+          hasReceivedDelta: false,
+          frameId: null,
+          lastSeq: -1
+        };
+
         startTransition(() => {
           setSelectedConversation(optimisticConversation);
+          setSelectedConversationId(sessionId);
           setResultsPage(null);
         });
 
-        if (selectedConversation?.mode !== "chat") {
-          setSelectedConversationId(null);
-        }
-
         try {
           const nextConversation = await sendChatMessage({
+            sessionId,
+            turnId,
+            runId,
+            userMessageClientId,
+            assistantMessageClientId,
             messageText: input.queryText,
-            conversationId:
-              selectedConversation?.mode === "chat" ? selectedConversation.id : undefined,
             modelProfileId: input.modelProfileId
           });
 
           const shouldAnimate = !chatStreamRef.current.hasReceivedDelta;
           clearChatStreamState();
-          const nextConversationWithAnimation = shouldAnimate
-            ? markLatestAssistantMessageForAnimation(nextConversation)
-            : clearStreamingMessageState(nextConversation);
 
           startTransition(() => {
-            setSelectedConversation(nextConversationWithAnimation);
-            setSelectedConversationId(nextConversationWithAnimation.id);
+            setSelectedConversation((currentConversation) => {
+              const mergedConversation = mergeConversationDetails(
+                currentConversation,
+                nextConversation
+              );
+
+              if (!mergedConversation || mergedConversation.mode !== "chat") {
+                return mergedConversation;
+              }
+
+              return shouldAnimate
+                ? markAssistantMessageForAnimation(
+                    mergedConversation,
+                    assistantMessageClientId
+                  )
+                : clearStreamingMessageState(
+                    mergedConversation,
+                    assistantMessageClientId
+                  );
+            });
+            setSelectedConversationId(sessionId);
             setResultsPage(null);
           });
           void loadConversationHistoryEvent();

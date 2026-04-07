@@ -15,3 +15,4 @@
 - 模型 API 测试错误增加脱敏和短消息处理，设置弹窗增强内部滚动约束，避免长错误撑破布局。
 - 设置中心和对话中的模型选择器切换到 shadcn 风格的 Button / Input / Select 组件，并统一到 `global.css` 配色 token。
 - 新增 `chat.start` 本地对话链路，agent 现在支持自由聊天；筛选论文继续作为对话中的特殊工具流存在。
+- 聊天流式协议改成 `session + turn + run + clientMessageId`，SQLite 消息表持久化 `client_message_id`，前端对最终会话结果改为按 `clientMessageId` merge，不再在流式完成时整条替换消息树。
